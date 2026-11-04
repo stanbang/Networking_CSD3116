@@ -1,25 +1,67 @@
-//idlc -l c messages.idl
-
-struct JoinRequest
-{
-	boolean b_dummy;
-};
-
-struct JoinResponse
-{
-	//IDL needs int width to be clearly defined
-    long int_player_id;
-};
-
-struct Input
-{
-	long int_player_id;
-    char ch_direction;
-};
-
-struct Position
-{
-	long int_player_id;
-	long int_x;
-	long int_y;
+// Bounded v2 wire types. Author: <team>, Codex assistance. Date: 2026-11-03.
+module Ast {
+  @final struct Join {
+    unsigned short int_version;
+    unsigned long long int_seq;
+    octet arr_nonce[16];
+  };
+  @final struct Response {
+    unsigned short int_version;
+    unsigned long long int_seq;
+    octet arr_nonce[16];
+    unsigned short int_status;
+    unsigned short int_player_id;
+    unsigned long long int_session;
+  };
+  @final struct Input {
+    unsigned short int_version;
+    unsigned long long int_seq;
+    unsigned long long int_session;
+    unsigned long long int_tick_ack;
+    unsigned long long int_client_time;
+    unsigned short int_player_id;
+    unsigned short int_keys;
+  };
+  @final struct Leave {
+    unsigned short int_version;
+    unsigned long long int_seq;
+    unsigned long long int_session;
+    unsigned short int_player_id;
+  };
+  @final struct Ship {
+    unsigned short int_player_id;
+    long int_x;
+    long int_y;
+    unsigned short int_angle;
+    short int_vx;
+    short int_vy;
+    unsigned short int_lives;
+    unsigned short int_respawn;
+    unsigned short int_invulnerable;
+    unsigned long int_score;
+    unsigned long long int_client_time;
+    unsigned long long int_distance_mm;
+  };
+  @final struct Bullet {
+    unsigned long int_id;
+    unsigned short int_owner;
+    long int_x;
+    long int_y;
+  };
+  @final struct Asteroid {
+    unsigned long int_id;
+    unsigned short int_size;
+    long int_x;
+    long int_y;
+  };
+  @final struct Snapshot {
+    unsigned short int_version;
+    unsigned long long int_seq;
+    unsigned long long int_tick;
+    sequence<Ship, 5> arr_ships;
+    sequence<Bullet, 128> arr_bullets;
+    sequence<Asteroid, 64> arr_asteroids;
+    unsigned short int_wave;
+    boolean b_gameover;
+  };
 };

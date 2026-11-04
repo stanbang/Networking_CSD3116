@@ -1,156 +1,124 @@
 # DDS Asteroids
 
-A real-time, interactive, distributed and **secure** 2D multiplayer asteroid shooter built on
-Cyclone DDS, OpenGL and GLFW. Developed for the CSD3116 Low-Level Programming team lab
-(DigiPen Institute of Technology Singapore, AY2026/2027, Trimester 1).
+Secure, server-authoritative co-op Asteroids in C, using Cyclone DDS, OpenGL, GLFW and OpenSSL. CSD3116, DigiPen SIT. Author: <team>, with declared Codex assistance; updated 2026-11-04.
 
-> Status: starter skeleton. Items under "Features" are targets; tick them off as they are built and tested.
+**Playable locally:** five-player networking, native DDS Security and gameplay/GUI tests pass. Hardening and a two-minute ASan/UBSan five-client churn pass. Full memory-safety verification remains incomplete: TSan reports in the uninstrumented system DDS library and Valgrind uninitialised-byte reports in its crypto send path require investigation. See `docs/TEST_REPORT.md` and `docs/PROGRESS.md`. LAN play, human feel and external Wireshark inspection require human checks.
 
-## Features (targets)
+## Quick start on this Windows machine
 
-- [ ] 2-5 players, server-authoritative simulation (ships, bullets, asteroids, score, lives)
-- [ ] Join, leave and crash-timeout handling (slots are freed)
-- [ ] Authenticated clients (X.509 identities signed by a private CA)
-- [ ] Encrypted and integrity-protected traffic (no plaintext game data on the wire)
-- [ ] Replay protection, input validation and rate limiting
-- [ ] Measured optimisations (perf evidence, before vs after)
-- [ ] Clean under AddressSanitizer, UBSan, ThreadSanitizer and Valgrind
+Run this in Windows Command Prompt or PowerShell:
 
-## Requirements
+```cmd
+wsl -d Ubuntu --cd /mnt/c/Users/jorda/Desktop/Networking_CSD3116 -- bash tools/play_local.sh
+```
 
-| Item | Notes |
+Or, inside Ubuntu:
+
+```bash
+cd /mnt/c/Users/jorda/Desktop/Networking_CSD3116
+bash tools/play_local.sh
+```
+
+The launcher builds the game, prepares private Linux credentials and opens two separate player windows. Click a window to control that player. Closing either window ends this local session. Logs are in `build/local-*.log`. Default session limit is one hour; use `--duration 120` for two minutes. `--fresh-certs` regenerates the private fixture, and `--headless --duration 5` runs two terminal bots. The launcher itself and the actual two-window game have been tested separately; GUI evidence uses Xvfb/software OpenGL.
+
+| Control | Action |
 |---|---|
-| OS | Ubuntu 24.04+ or WSL2 (Ubuntu). macOS is allowed by the brief, but the Makefile targets Linux. |
-| Compiler | GCC with C11 support |
-| Libraries | Cyclone DDS (`cyclonedds-dev`, `cyclonedds-tools`), GLFW 3 (`libglfw3-dev`), OpenGL (`libgl1-mesa-dev`), OpenSSL (`libssl-dev`) |
-| Tools | `make`, `pkg-config`, `gdb`, `valgrind`, `openssl`; `perf` only on a real Linux machine |
-| WSL GUI | Needs WSLg (Windows 11, or recent Windows 10). Check with `echo $DISPLAY`. |
+| Up | Thrust |
+| Left / Right | Rotate |
+| Space | Fire |
+| R | Restart after shared game-over |
+| Escape | Leave / close window |
 
-## 1. Get the code
+Ships have inertia/friction and wrap across all edges. Large rocks split into medium, then small; kills award 20/50/100 points. Three lives per player; a hit causes a one-second respawn and two seconds of protection. Friendly fire is off. The HUD shows all players' lives/scores, wave, connection state and an input-echo RTT estimate. See `docs/P3_GAME.md` for mechanics, snapshot bounds and threading.
+
+## Requirements and build
+
+Ubuntu 24.04/WSL2, GCC/C11, make, pkg-config, Cyclone DDS development/tools, GLFW3, OpenGL, OpenSSL development headers. Graphical play needs WSLg or an X11 display. This machine has Cyclone DDS 0.10.4, GLFW 3.3.10 and OpenSSL 3.0.13; other package layouts have not been verified.
+
+A human can install dependencies inside Ubuntu:
 
 ```bash
-git clone <YOUR_REPO_URL> dds-asteroids
-cd dds-asteroids
+sudo apt update
+sudo apt install -y build-essential pkg-config git gdb valgrind openssl libssl-dev libgl1-mesa-dev libglfw3-dev cyclonedds-dev cyclonedds-tools xvfb xauth imagemagick xdotool tcpdump
 ```
 
-## 2. Install the environment
+From a fresh checkout of this repository:
 
 ```bash
-bash tools/setup_env.sh
+make -j2
+make test
+make baseline
+make SAN=asan
+make SAN=tsan
+make check-hardening
 ```
 
-This installs every dependency and prints a checklist: tool versions, whether DDS Security plugins exist,
-display status, and ASLR status. Read the output; it decides which security design you can use.
+Game executables are `build/release/server` and `build/release/client`; sanitizer builds have separate directories. IDL bindings are generated automatically. Original lecturer bindings are isolated under `build/baseline-gen`; baseline/third_party reference files remain unchanged. The baseline has original source warnings; new game code builds warning-free. Build flags alone do not prove sanitizer cleanliness: see `docs/TEST_REPORT.md` for actual results and limitations.
 
-### If the checklist says DDS Security plugins are missing
-
-The apt package may be built without them. Build Cyclone DDS from source (needs `cmake`):
+## Credentials and separate processes
 
 ```bash
+bash tools/gen_certs.sh
+```
+
+The final line prints `SECURITY_DIR=/tmp/dds-asteroids.<random>`. Use the actual path below. The Linux directory is 0700 and private keys are 0600; they may disappear on reboot. The Windows-mounted repository does not enforce these Unix modes, so credentials stay outside it. Normal game processes fail closed on unsafe/missing credentials, plugins or policies.
+
+```bash
+./build/release/server --security-dir /tmp/YOUR_PRIVATE_BUNDLE --duration 3600
+# Separate terminals, distinct identities:
+./build/release/client --security-dir /tmp/YOUR_PRIVATE_BUNDLE --identity 1 --duration 3600
+./build/release/client --security-dir /tmp/YOUR_PRIVATE_BUNDLE --identity 2 --duration 3600
+```
+
+Headless clients accept `--headless --bot idle|circle|straight|hunter`. Server also accepts `--ticks N`. `--test-scenario gameover` is an explicit server-only collision fixture for automated testing; it changes setup, is off by default, and is not normal gameplay.
+
+Native DDS Security uses mutual CA-chained X.509 identities, signed exact-topic permissions and encrypted governance. Only the server can publish authoritative snapshots/responses. The full provisioning fixture holds CA and all participant keys: **never distribute it**. Create a minimal bundle for each machine/participant:
+
+```bash
+bash tools/export_identity.sh /tmp/YOUR_PRIVATE_BUNDLE server
+bash tools/export_identity.sh /tmp/YOUR_PRIVATE_BUNDLE client1
+bash tools/check_secrets.sh
+```
+
+The secret checker can be installed by the human as a pre-commit hook. Agents do not commit or push. Never include private keys in source zips, logs, slides or videos. Preserve audit final root and record count separately; an unanchored hash chain does not prevent a complete log rewrite. Certificate/policy renewal and compromise limits are described in `docs/THREAT_MODEL.md`.
+
+## Networking
+
+`config/cyclonedds.xml` defaults to same-host unicast on loopback, domain 42, participant indices 0–15. It is automatically loaded unless `CYCLONEDDS_URI` is set. Standard DDS port arithmetic gives UDP 17910–17941 for these unicast participant pairs; packet capture can include 17900–17941. This is a local configuration, not an assertion that WSL NAT forwards multicast.
+
+For two machines, configure each machine's actual LAN interface and explicit peer addresses in a separate XML and set `CYCLONEDDS_URI` to that file. Keep the trace/discovery categories if you need the native rejection/decrypt audit events. Share one trusted policy/CA provisioning set but give each process only its own minimal bundle. WSL mirrored/NAT behavior, firewall and real LAN latency are not verified by loopback tests. The [CycloneDDS configuration reference](https://cyclonedds.io/docs/cyclonedds/0.10.3/config.html) and installed headers are the authority for options.
+
+## Reproduce checks
+
+Replace the security directory with the actual generated fixture path. Run network harnesses one at a time: they share DDS domain 42.
+
+```bash
+make test
+python3 tests/p1_network.py --security-dir /tmp/YOUR_PRIVATE_BUNDLE
+python3 tests/p3_gameplay.py --security-dir /tmp/YOUR_PRIVATE_BUNDLE
+python3 tests/p3_gui.py --security-dir /tmp/YOUR_PRIVATE_BUNDLE
+cc -shared -fPIC -Wall -Wextra tests/rtps_fault.c -o build/rtps_fault.so -ldl -pthread -lcrypto
+python3 tests/p2_security.py --security-dir /tmp/YOUR_PRIVATE_BUNDLE
+```
+
+The security harness uses genuine post-encryption ciphertext corruption, actual native GCM failure and separately chained production diagnostics; it does not substitute a plaintext change before encryption. No-cert discovery is logged as an unauthenticated observation with identity 0 under denying governance, not as an invented certificate failure. The forbidden server-publication test is denied locally by native access control; it does not invent a remote server event for a packet never sent.
+
+Actual unit, five-bot, lifecycle, security, controlled game-over/restart and two-window results are in `docs/TEST_REPORT.md`; findings are in `docs/REVIEW_LOG.md`. Human checks of smoothness, controls, LAN play and Wireshark are in `docs/PLAYTEST.md`. Later phases cover sanitizers, Valgrind, measured optimisation and submission materials; their status is explicit in `docs/PROGRESS.md`.
+
+## Remaining verification prerequisite
+
+The playable release, unit/physics/security checks, five-client gameplay, controlled restart, two GUI windows, fail-closed hardening and ASan/UBSan churn have actual passing evidence. Full TSan and Valgrind acceptance **does not pass**. Disabling ASLR only for the TSan test processes fixes startup mapping, but the actual game still reports DDS-library races. Valgrind shows zero heap left at exit in all six processes but reports uninitialised bytes in client native-crypto sendmsg paths. No suppressions or blanket false-positive claims were used.
+
+A matching instrumented dependency build/investigation needs CMake, which is missing inside Ubuntu. The human can run there:
+
+```bash
+sudo apt update
 sudo apt install -y cmake
-git clone https://github.com/eclipse-cyclonedds/cyclonedds.git
-cd cyclonedds && mkdir build && cd build
-cmake -DCMAKE_INSTALL_PREFIX=$HOME/cdds -DENABLE_SECURITY=ON ..
-cmake --build . --parallel && cmake --build . --target install
-export CMAKE_PREFIX_PATH=$HOME/cdds
-export PKG_CONFIG_PATH=$HOME/cdds/lib/pkgconfig:$PKG_CONFIG_PATH
-export LD_LIBRARY_PATH=$HOME/cdds/lib:$LD_LIBRARY_PATH
 ```
 
-(Check the Cyclone DDS docs for the current option names if the build rejects a flag.)
+This is a prerequisite for investigation, not a promised fix. Agents did not install tools or change global ASLR. P4 remains partial; the ten-minute course soak, literal committed clean-clone verification, optimisation evidence and final submission materials remain pending.
+## Repository and AI declaration
 
-## 3. Build
+`src/common` holds simulation, protocol, snapshots, security and audit; `src/server` owns authoritative state; `src/client` owns rendering/input and snapshot history. `idl` holds bounded wire types, `tests` contains behavior/negative harnesses, and `tools` contains setup/provisioning/launch/check helpers.
 
-```bash
-make                 # hardened release build -> build/release/{server,client}
-make baseline        # lecturer's original programs, for comparison
-make SAN=asan        # AddressSanitizer + UBSan build -> build/asan/
-make SAN=tsan        # ThreadSanitizer build -> build/tsan/
-make check-hardening # confirms PIE, NX, RELRO and stack canary are present
-```
-
-`messages.c` and `messages.h` are generated from `idl/messages.idl` by `idlc` during the build
-and are not committed.
-
-## 4. Generate certificates (security)
-
-```bash
-bash tools/gen_certs.sh            # writes to security/generated/ (gitignored)
-```
-
-Private keys never leave `security/generated/`. Do not copy them into the repo, the zip or the slides.
-
-## 5. Run
-
-Start the server first, then each client in its own terminal (one client per player):
-
-```bash
-./build/release/server
-./build/release/client      # repeat for each player
-```
-
-Controls: arrow keys to turn and thrust, space to fire (click the window first to focus it).
-
-### Playing across machines or WSL instances
-
-DDS discovery uses UDP multicast by default, which WSL2's default NAT networking does not forward.
-Either enable mirrored networking in `%UserProfile%\.wslconfig` (`networkingMode=mirrored`), or point
-Cyclone DDS at explicit unicast peers via `CYCLONEDDS_URI=file://$PWD/config/cyclonedds.xml`.
-
-## 6. Test and profile
-
-```bash
-make SAN=asan && ./build/asan/server        # memory errors, UB
-make SAN=tsan && ./build/tsan/server        # data races
-valgrind --leak-check=full ./build/release/server
-```
-
-`perf` does not work in WSL (no hardware counters). Copy the headless benchmark to the course Linux
-server over SSH and run short jobs only (the server is shared):
-
-```bash
-gcc -O2 bench/<bench>.c -o bench_x
-perf stat -r 20 -e cycles,instructions,branches,branch-misses,L1-dcache-loads,L1-dcache-load-misses ./bench_x
-```
-
-Record results in `docs/PERFORMANCE.md` (baseline vs optimised).
-
-## 7. Repository layout
-
-```
-idl/           DDS message definitions (messages.idl)
-src/common/    protocol, validation, crypto helpers, logging, shared constants
-src/server/    authoritative game state, join/leave, networking
-src/client/    rendering (GLFW/OpenGL), input, networking
-baseline/      lecturer-provided server.c / client.c (read-only reference)
-third_party/   stb_easy_font.h
-config/        Cyclone DDS XML configuration
-security/      security docs; generated keys go to security/generated/ (ignored)
-tools/         setup_env.sh, gen_certs.sh
-bench/         headless micro-benchmarks for perf
-tests/         unit and negative security tests
-docs/          PROMPT.md, threat model, performance report, AI usage log
-```
-
-## 8. Team and contributions
-
-| Member | Role | Main contributions |
-|---|---|---|
-| _name_ | Team leader | _fill in_ |
-| _name_ | | _fill in_ |
-| _name_ | | _fill in_ |
-
-## 9. Declaration of AI use
-
-AI assistance is allowed and must be declared in every deliverable. Maintain `docs/AI_USAGE.md`:
-a summary of the prompts used, what was generated, and how each piece was tested and understood.
-
-## 10. Troubleshooting
-
-| Symptom | Likely cause and fix |
-|---|---|
-| `idlc: command not found` | `cyclonedds-dev` not installed, or install prefix not on `PATH` |
-| `cannot open display` / GLFW init fails | WSLg not available; update WSL (`wsl --update`) and restart |
-| Clients never join | Multicast blocked; use the unicast peer config (section 5) |
-| `perf` reports no events | You are in WSL; use the course Linux server |
-| `_FORTIFY_SOURCE redefined` warning | Keep `-U_FORTIFY_SOURCE` before `-D_FORTIFY_SOURCE=2` (already in the Makefile) |
+AI assistance was used and must be declared in the zip, slides and video. `docs/AI_USAGE.md` records generated work, independent review and actual testing. Team names, contributions, human narrated video and final slide authorship remain for the team to fill in; no human contribution is invented.

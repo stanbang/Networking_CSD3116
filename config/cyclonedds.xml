@@ -1,0 +1,16 @@
+<!-- Loopback unicast, validated against installed0.10.4 cfgelems. Author: team/Codex, 2026-11-03. -->
+<CycloneDDS>
+  <Domain id="42">
+    <General>
+      <Interfaces><NetworkInterface name="lo" multicast="false"/></Interfaces>
+      <AllowMulticast>false</AllowMulticast>
+    </General>
+    <Discovery>
+      <ParticipantIndex>auto</ParticipantIndex>
+      <MaxAutoParticipantIndex>15</MaxAutoParticipantIndex>
+      <Peers><Peer Address="127.0.0.1"/></Peers>
+    </Discovery>
+    <!-- Server keeps failed-decrypt and unauthenticated discovery metadata only. -->
+    <Tracing><Category>trace</Category></Tracing>
+  </Domain>
+</CycloneDDS>
