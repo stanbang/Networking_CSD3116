@@ -1,3 +1,47 @@
+# Latest teammate takeover - 5 November 2026
+
+Stanley requested a teammate handover and publication of completed work. Read [TEAMMATE_HANDOVER_2026-11-05.md](../TEAMMATE_HANDOVER_2026-11-05.md) first. It lists verified work, open gates/tests, requested but unimplemented login/high-score/remember-user tasks for Jordain, contribution honesty and source-ZIP inclusions/exclusions. Existing blocked capture and other limitations remain. Historical status below is preserved.
+
+# CURRENT: T3 approved; human game test and capture pending - 5 November 2026
+
+User approved T3 with an additional request for exact build/run/manual verification instructions. See docs/RUN_AND_VERIFY.md. Capture helper now requests full IPv4 packets; syntax, invalid arguments and synthetic2042-byte filter checks passed, but live capture/analysis remain pending. No agent sudo. README points to the new guide. Prior approval/status text below is historical. T4 capture analysis and final packaging verification are not complete.
+
+# CURRENT: T3 evidence ready, awaiting approval - 5 November 2026
+
+T1 fallback approved and verified. T2 fresh-clone-plus-working-patch checks passed. T3 evidence and disclosed limitations are in docs/EVIDENCE.md. Stop until APPROVED T3 or FIX. T4/T5 not started. Older status headings below are preserved history.
+
+# T1 approved fallback verified; T2 next - 5 November 2026
+
+See the appended T1 verification below. Prior awaiting-approval text is historical.
+
+# T1 fallback approved - 5 November 2026
+
+User explicitly replied "Approved T1". Implemented timeout-only warning after successful Leave write; all other write/ACK/cleanup failures still fail. This is an accepted known limitation, not a transport ACK fix. P1 lifecycle tests now require a fresh per-identity server Leave/slot-release event after each graceful stop and retain replacement-admission checks, including a final replacement. Same-identity sessions are sequential, so a previous session's audit entry cannot satisfy the count increase. Production server clears the slot before emitting the event. Existing failure evidence is preserved. Review and targeted runtime verification pending; T2 not started.
+
+---
+
+# SLIM FINISH MODE - current scope, 5 November 2026
+
+This replaces the earlier goal and its automatic phase workflow. Single agent; earlier delegated work stopped. Preserve existing implementation and evidence. No broad scans, dependency internals, fresh sanitizer investigations, or rebuilding the game from scratch. At most one repair attempt per issue; targeted tests only, full suite once at the end, two-minute soak. Stop for approval after T1 and T3. Never run sudo or silently weaken test expectations.
+
+T1 targeted assessment: inspected client send_leave and shared endpoint QoS. Leave writes to the correct writer, then waits one second before listener removal. Reliable Leave uses matching endpoint settings, bounded KEEP_ALL32, max blocking100ms and automatic liveliness3s. Re-read existing ack-resume-network1 evidence: matched readers1 before/after; ACK returned-10 after1000571819ns; leave_ack Timeout; suite exit1. Server recorded identity6 Leave, but receipt does not prove transport ACK completion. No justified application/QoS repair identified. Production code and test expectations unchanged; no new game runtime or rebuild in this slim assessment. Prior goal turn made progress by preserving diagnostic evidence, not by fixing ACK.
+
+STOP: awaiting T1 approval. Proposed fallback ONLY for DDS_RETCODE_TIMEOUT after a successful Leave write: emit a clear warning and allow normal client exit0. Other write/ACK/cleanup failures remain failures. Tests must independently establish that the specific session's slot is freed using its explicit Leave audit or observed lease expiry, plus successful replacement admission. Document native transport acknowledgement as a known limitation; never label the timeout fixed or transport reliability passed. Do not implement this proposal before approval.
+
+Remaining slim tasks after approval: T2 clean clone without keys, make/test/hardening, two-client headless and strict GUI; T3 evidence document from existing results plus course perf commands, then approval gate; T4 capture helper check and human sudo capture followed by unprivileged analysis; T5 README/limitations/AI log/handover/source ZIP exclusions. TSan/Valgrind dependency findings, two-computer test, further GUI investigation, slides and video are out of scope and remain disclosed limitations. The new clock-witness diagnostic is preserved but has not been run and is not part of this finish plan.
+
+---
+# Resumed P1 investigation - 5 November 2026
+
+User instructed "continue with the goal", revoking the pause. Checkpoint 3dae8e3b236848b5a2b4fc584b1ba83f14395ea4 is verified on origin/main with git ls-remote; local worktree was clean. HANDOVER.md remains the historical paused snapshot. No P1 approval or goal completion is implied.
+
+Current bounded repair cycle: the listener implementation is candidate 1. Active GUI guards passed previously, but graceful native Leave ACK remains failing. Resume builder/reviewer/tester independently with read-only diagnosis first. Coordinate all runtime tests through the orchestrator to avoid overlapping server/clients. No new breaking IDL, longer ACK deadline, crypto downgrade or ignored error is authorized.
+
+Acceptance for the next candidate: identify a concrete cause with native/API/QoS and log evidence; independently review the smallest change; run relevant build/units, fresh P1 headless and strict GUI without diagnostics preload or thread caps; retain raw output and inspect screenshots. Require correct admission/cap/leave/rejoin/crash reclaim, responsive distinct ships and zero unexpected lease loss. Any native timeout remains a failure. After own checks pass, launch WSLg server and two clients, confirm windows and deliver numbered manual checklist, then STOP for APPROVED P1 or FIX. Max 3 repair loops still applies.
+
+Resumed preflight output (command -v): /usr/bin/xvfb-run, /usr/bin/xauth, /usr/bin/import, /usr/bin/xdotool, /usr/bin/tcpdump. CMake is still absent; matching instrumented dependency work in P4 requires the human's previously documented installation command. No server/client/Xvfb processes were listed. Private fixture directory metadata: mode700 uid1000. CycloneDDS version0.10.4. These are prerequisite checks, not new runtime passes.
+
+---
 # Paused checkpoint - latest authoritative status
 
 Stanley explicitly paused the goal on4November2026 and requested a teammate handover plus publication. Read HANDOVER.md first. The listener repair preserves active two-client GUI state in the latest targeted run, but overall GUI/network checks still FAIL native one-second Leave ACK timeout. No further game tests/repairs after pause. Selected portable raw evidence is in docs/evidence/2026-11-04-handover/. Earlier status text below is historical. No goal-complete or submission-ready claim.
@@ -170,3 +214,33 @@ User explicitly replied FIX: continue GUI investigation. New maximum-three-loop 
 Fresh default software-GL reproduction failed; reducing LP_NUM_THREADS to2 lowered each client from74 to14threads but still caused2lease expiries. The old GUI harness printed PASS despite timeouts; current stricter checks reject that false positive and require distinct IDs, sustained own-state receipt, final fresh progress, zero timeouts/invalid sessions and two normal leaves. Diagnostic-only wrappers preserve arguments/results/errno and report real dds_waitset_wait requests50,000,000ns taking~4.47-4.78seconds. Read-only observer samples continued at~0.5s, lowCPU and amplememory; CPU starvation and clock jumps are not established. Native emptyguard probe12pairs and extended60pairs returned normally at~50ms with realtime/monotonic/DDS clocks aligned. Exact0.10.4 source shows mutex acquisition/reacquisition outside the APIcondition deadline; underlying internal cause is not yet proven.
 
 Reviewer approved event-driven dataavailable listeners plus fixed ready-bitmask and CLOCK_MONOTONIC condition as the bounded application fix. No native positive timedwait/polling-sleep workaround; no new threads, IDL, QoS, crypto or lease changes. Callbacks only signal the queue, all DDS work is outside its lock, full batches requeue, startup contexts are stable, synchronous listener detach precedes cleanup. Builder implementing; tester will run fresh native headless lifecycle and strict original-default GUI tests without LPcap/preload. Known P4/native timer and lease-recovery limitations remain explicit; this is not a sanitizer or full-security pass.
+
+
+## Approved T1 fallback verification - 5 November 2026
+
+User approval: "Approved T1". Separate review confirmed only DDS_RETCODE_TIMEOUT following successful Leave write is downgraded to an explicit warning. Write errors, other ACK errors and cleanup errors remain fatal. No security, QoS, lease, wire-format or timeout changes. The native ACK problem remains a known limitation.
+
+Actual incremental client compile exit0; full compiler output: build/evidence/slim-t1-build.txt. Targeted native lifecycle run, no preload/thread cap: tests/p1_network.py --security-dir <private Linux bundle> --output-dir build/evidence/slim-t1-network1; exit0. Output includes PASS fresh server slot release per identity, PASS final fault slot permits replacement, SERVER_SUMMARY joins13 rejects1 leaves12 timeouts1 invalid4 stale1 peak5, and PASS lifecycle audit records36. One timeout is the intentional SIGKILL lease test. Complete output and exit file retained; this run did not emit the warning and alone did not exercise the fallback branch.
+
+Explicit test-only public API fixture tests/force_ack_timeout.c simulates DDS_RETCODE_TIMEOUT, without probing internals. Compiled with cc -std=gnu11 -Wall -Wextra -Werror -fPIC -shared; isolated tests/ack_probe.py --dds-markers build/force_ack_timeout.so --output-dir build/evidence/slim-t1-forced-timeout exited0. Actual output: CLIENT_WARNING leave_ack_timeout: transport acknowledgement unconfirmed; server slot release requires independent verification; CLIENT_EXIT; server_leave_observed true; audit_leave_observed true; client_cleanup_exit0; server_cleanup_exit0; status PASS. This establishes application handling of an injected timeout, not native ACK reliability. Full output: build/evidence/slim-t1-forced-timeout-output.txt.
+
+T1 approved fallback implemented and targeted checks passed; T2 reproduction pending. Existing unsuppressed dependency findings and all historical failures remain disclosed.
+
+
+## T2/T3 slim checkpoint - 5 November 2026
+
+T2 fresh clone plus current working patch: build/unit/hardening exit0; headless124.539seconds after both admissions, joins2/leaves2/timeouts0/invalid0, audit verified; strict GUI exit0, both new final screenshots inspected once with connected HUDs, ships and asteroids. Not a clean published final revision. Complete nonsecret output copied into docs/evidence/2026-11-05-slim-finish/. T3 docs/EVIDENCE.md uses existing results only, labels historical P2 results, records missing idle CPU/profiler data and all excluded work as limitations. Exact course perf commands prepared with explicit missing-binary prerequisite. STOP at T3 approval gate; no T4 capture work or T5 packaging yet. Native ACK reliability remains unproven despite approved application fallback. No new sanitizer runs or benchmarks.
+
+
+## Slim final-documentation reconciliation - 5 November 2026
+
+T3 approval is recorded. README current limitations and known team roster, EVIDENCE status, AI-use record and RUN_AND_VERIFY handover are reconciled. Source-ZIP instructions explicitly require human review/commit, forbidden filename check and archiving the reviewed revision; no archive has been generated or submitted. Exact requested live capture path /home/stanley/.local/state/dds-asteroids/captures/secure-manual-20261105-01.pcap was checked: Exists False; Bytes not available. No new live capture, game run, build or test rerun. T4 analysis cannot proceed without the actual human-generated file/path. T5 documentation/instructions are prepared, subject to adding the real capture outcome and final evidence audit. No full-goal completion claim.
+
+
+## User-requested automatic launcher and lecturer checklist test - 5 November 2026
+
+See REQUIREMENTS_CHECK.md and docs/evidence/2026-11-05-requirements/. Real play_local.sh --duration45 under isolated software-GL Xvfb passed two admissions/windows, real key input, fresh shared state, first-client Leave and session exit0: joins2 leaves2 timeouts0 invalid0 peak2 moves1627 shots14 snapshots310. Both new final screenshots inspected once. Actual WSL and OpenGL/GLFW/DDS linkage confirmed; no remaining game/Xvfb process rows.
+
+Targeted authentication first attempt FAILED due to my identity2 fixture selection: rogue_client2.crt missing, so no server auth-warning audit. Preserved and reported. One test-setup correction selected generated rogue identity6: wrong-ca and no-cert rejected exit1 while a legitimate client stayed alive; no extra slots, auth_failures6, server audit verified, test exit0. No product/security/assertion change.
+
+Approval is limited to tested launcher/local multiplayer/certificate rejection. Cross-machine operation and external encryption capture remain unverified; cached-glyph/condition-wait concepts are confirmed but speedup/idleCPU is unmeasured. Known ACK/sanitizer limitations retained. No full-suite or sanitizer/benchmark rerun and no agent sudo. User's full requirement list is not yet approved.

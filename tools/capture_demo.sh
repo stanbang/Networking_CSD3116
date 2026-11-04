@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Purpose: bounded, local P0 DDS capture. Author: CSD3116 team + AI; 2026-11-04.
+# Purpose: bounded, local secure-game DDS capture. Author: CSD3116 team + AI; updated 2026-11-05.
 # Human invokes with sudo if needed; this script never invokes sudo itself.
 # Output stays in the invoking user's Linux home, where mode 0600 can be verified.
 # IPv4 RTPS magic selects DDS packets even when Cyclone chooses ephemeral UDP ports.
@@ -8,7 +8,7 @@ set -euo pipefail
 umask 077
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 SECONDS_TO_CAPTURE="${1:-30}"
-BASENAME="${2:-p0-demo.pcap}"
+BASENAME="${2:-secure-demo.pcap}"
 INTERFACE="${3:-lo}"
 if (( $# > 3 )) || [[ ! "$SECONDS_TO_CAPTURE" =~ ^[0-9]{1,3}$ ]] ||
    (( 10#$SECONDS_TO_CAPTURE < 1 || 10#$SECONDS_TO_CAPTURE > 120 )); then
@@ -29,7 +29,7 @@ for TOOL in tcpdump timeout mktemp; do
     command -v "$TOOL" >/dev/null || { echo "Missing $TOOL" >&2; exit 1; }
 done
 if [[ -n "${CYCLONEDDS_URI:-}" ]]; then
-    echo 'P0 launcher uses default DDS configuration; unset CYCLONEDDS_URI first.' >&2
+    echo 'Unset CYCLONEDDS_URI; this guide verifies config/cyclonedds.xml (domain42, loopback).'  >&2
     exit 1
 fi
 CAPTURE_USER="$(id -un)"
@@ -76,7 +76,7 @@ if [[ "$(stat -c %a -- "$DEST")" != 700 ||
     echo 'Refusing symlinked/unowned capture directory or existing output.' >&2
     exit 1
 fi
-TEMP="$(mktemp "$DEST/.p0-capture.XXXXXXXX")"
+TEMP="$(mktemp "$DEST/.dds-capture.XXXXXXXX")"
 trap 'rm -f -- "$TEMP"' EXIT
 if (( EUID == 0 )); then chown -- "$CAPTURE_UID:$CAPTURE_GID" "$TEMP"; fi
 chmod 600 -- "$TEMP"
@@ -85,16 +85,16 @@ if [[ "$(stat -c %a -- "$TEMP")" != 600 ||
     echo 'This filesystem cannot provide private user-owned capture files.' >&2
     exit 1
 fi
-echo "P0 PLAINTEXT capture: $INTERFACE, IPv4 RTPS on any UDP port, ${SECONDS_TO_CAPTURE}s."
-echo 'Bound: 10000 packets, 256 captured bytes per packet (P0-only, truncated).'
+echo "DDS capture: $INTERFACE, IPv4 RTPS on any UDP port, ${SECONDS_TO_CAPTURE}s."
+echo 'Bound: 4000 packets, 65535 captured bytes per packet; full IPv4 UDP datagrams when unfragmented.'
 echo 'Filter: ip and udp and udp[8:4] = 0x52545053 (RTPS header; no authentication).'
 echo 'Other IPv4 DDS/RTPS traffic on this interface can be captured; no domain isolation.'
-echo 'No IPv6 or IP-fragment reassembly; intended for the small P0 reference messages.'
-echo 'Loopback may be empty when the baseline uses eth0; choose its actual interface.'
-echo 'Run play.sh in another terminal. Capturing packets does not prove encryption.'
+echo 'No IPv6 or IP-fragment reassembly. Analysis must check truncation and RTPS security structure.'
+echo 'Current secure config uses domain42 on lo. Baseline/other configurations require their actual interface.'
+echo 'Start capture first, then launch the secure game in another terminal. Capture alone does not prove encryption.'
 set +e
 timeout --signal=INT --kill-after=3s "${SECONDS_TO_CAPTURE}s" \
-    tcpdump -n -i "$INTERFACE" -s 256 -c 10000 -U -Z "$CAPTURE_USER" \
+    tcpdump -n -i "$INTERFACE" -s 65535 -c 4000 -U -Z "$CAPTURE_USER" \
     -w "$TEMP" 'ip and udp and udp[8:4] = 0x52545053'
 RESULT=$?
 set -e
@@ -103,7 +103,7 @@ if (( RESULT != 0 && RESULT != 124 )); then
     exit "$RESULT"
 fi
 if (( $(stat -c %s -- "$TEMP") <= 24 )); then
-    echo 'No packets captured; P0 may use another interface. No evidence produced.' >&2
+    echo 'No packets captured; check game activity/interface. No evidence produced.' >&2
     exit 1
 fi
 # tcpdump's stderr includes its packet counts; a complete packet must also exist.

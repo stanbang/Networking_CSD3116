@@ -813,3 +813,272 @@ Fallback unit target returned0 and printed PASS audit exclusive creation and sym
 
 ## Paused teammate checkpoint
 User explicitly paused goal dueusage and authorized handover+commit/push. HANDOVER.md is current; selected actual nonsecret output copied under docs/evidence/2026-11-04-handover/ because build/ is ignored. Native ACK diagnostic measured requested1e9ns elapsed1000082330ns result-10; this is not a waitset overshoot. Latest active GUI has timeouts0/invalid0/freshconnected state, but overall network and GUI remain FAIL during ACK shutdown. No game tests/repairs ran afterpause, no private material included, no completion claim.
+
+
+## 5 November 2026 - isolated ACK versus unchanged P1 churn
+
+Scope: independent tester resumed with explicitly authorized bounded diagnostics.
+The production one-second ACK request, three-second application lease, native
+security, IDL and acceptance assertions were not changed for either case. The
+shim is diagnostic-only and is loaded only into DDS-linked server/client children.
+Neither an instrumented pass nor application Leave receipt establishes full P1/P4
+acceptance. No sudo or private-key contents were read or printed.
+
+### Server lifetime hypothesis: source and recorded chronology
+
+The full P1 harness (`tests/p1_network.py:81`) starts its server with duration180s.
+It stops the fault client at line115 before the normal server stop at line120;
+failure cleanup at line137 signals owned children in reverse creation order, so
+the server is last. `src/server/main.c` derives a10800-tick budget at60Hz after
+readiness. The earlier ACK run ended at598ticks, and the fresh comparison at540,
+far below that budget. There is no evidence that the server's configured lifetime
+expired before ACK. Application receipt is separate from native reliable-reader
+acknowledgement.
+
+Earlier ACK record: auditSTART1793790689297406767ns; client ACKentry realtime
+1793790697062774957ns (7.765368190s later); server Leave recorded
+1793790697063665865ns (+0.890908ms after ACKentry); native ACK timeout about1s
+after entry. Other legitimate client leaves were recorded only after+2073.679ms.
+These are recorded timestamps, not an invented emission or network-packet trace.
+
+### Isolated case: PASS for this bounded diagnostic only
+
+One fresh identity6 spoof client, no peer churn, server60s/client30s. The probe
+waited for accepted assignment, actual spoof rejection and an own-state snapshot,
+requested clientSIGTERM, then retained the server through client exit plus2s.
+Actual probe command, child commands and result follow verbatim:
+
+```text
+COMMAND python3 -B tests/ack_probe.py --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --dds-markers /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/dds_call_markers.so --output-dir build/evidence/ack-resume-isolated1
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/server --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --duration 60 --audit-file /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/evidence/ack-resume-isolated1/audit.log
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 6 --headless --bot idle --fault spoof --duration 30
+{
+  "scope": "isolated single-identity Leave/ACK diagnostic",
+  "server_duration_seconds": 60,
+  "client_duration_seconds": 30,
+  "production_ack_timeout_seconds": 1,
+  "events": [
+    {
+      "event": "child_started",
+      "role": "server",
+      "pid": 2171,
+      "monotonic_ns": 10602460158622
+    },
+    {
+      "event": "server_ready_observed",
+      "monotonic_ns": 10602572519661
+    },
+    {
+      "event": "child_started",
+      "role": "client",
+      "pid": 2179,
+      "monotonic_ns": 10602576133197
+    },
+    {
+      "event": "client_sigterm_requested",
+      "monotonic_ns": 10603369050441,
+      "realtime_ns": 1793817955796372876,
+      "server_alive": true
+    },
+    {
+      "event": "client_exit_observed",
+      "monotonic_ns": 10603435506220,
+      "realtime_ns": 1793817955862829029,
+      "code": 0,
+      "server_alive": true
+    },
+    {
+      "event": "cleanup_signal",
+      "pid": 2171,
+      "monotonic_ns": 10605460764937
+    }
+  ],
+  "assigned_id": 1,
+  "client_exit": 0,
+  "server_alive_after_client_exit": true,
+  "server_alive_two_seconds_later": true,
+  "server_leave_observed": true,
+  "audit_leave_observed": true,
+  "client_cleanup_exit": 0,
+  "server_cleanup_exit": 0,
+  "server_summary_observed": true,
+  "status": "PASS"
+}
+OBSERVED_EXIT=0
+
+```
+
+Actual isolated client output (public addressing and numeric timing only):
+
+```text
+CLIENT_JOIN nonce=38ea7446b82ab3c59ad05a62ddbf8e6b id=1 status=accepted
+CLIENT_SNAPSHOT tick=42 id=1 x=18000 y=30000 score=0 lives=3 vx=0 vy=0 distance_mm=0
+DDS_ACK_MATCH stage=before result=1 query_elapsed_ns=4911 clock_valid=1
+DDS_ACK_RESULT returned=0 requested_ns=1000000000 elapsed_ns=1843 clock_valid=1
+DDS_ACK_MATCH stage=after result=1 query_elapsed_ns=1279 clock_valid=1
+CLIENT_EXIT
+
+```
+
+Actual isolated server output:
+
+```text
+AUDIT_FILE /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/evidence/ack-resume-isolated1/audit.log
+SERVER_READY security=NATIVE_DDS domain=42
+SERVER_JOIN identity=6 id=1 status=accepted
+SERVER_DROP identity=6 reason=spoof
+SERVER_LEAVE identity=6 id=1
+SERVER_SUMMARY joins=1 rejects=0 leaves=1 timeouts=0 invalid=1 stale=0 peak=1 inputs=0 rate_hits=0 auth_failures=0 middleware_events=0 moves=0 shots=0 destroyed=0 splits=0 hits=0 respawns=0 gameovers=0 restarts=0 wraps=0 snapshots=57 points=0 ticks=176
+AUDIT_ROOT hash=0ce7eaf86ec8a88e333d099a57d38fa355da8cb2053c900481b8ccc7b35d4b9d records=4
+
+```
+
+Matched-subscription query returned1 before and after. Native ACK returned0 in
+1843ns for the unchanged1000000000ns request. This is a subscription count, not
+an identity or per-reader acknowledgement report. Client/server exit0, Leave
+receipt/audit and live server two seconds after client exit were observed.
+
+### Unchanged full P1 churn comparison: FAIL, exit1
+
+The existing acceptance suite was run once with the same compiled diagnostic shim.
+Concurrent admission/cap/leave/crash recovery reached their existing assertions.
+It again failed on the spoof client's nonzero shutdown, without relaxing that
+assertion. Actual command and output:
+
+```text
+COMMAND python3 -B tests/gui_runtime_diagnostics.py --suite network --dds-markers /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/dds_call_markers.so --diagnostics build/evidence/ack-resume-network1.jsonl --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --output-dir build/evidence/ack-resume-network1
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/server --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --duration 180 --audit-file /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/evidence/ack-resume-network1/server-audit.log
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 1 --headless --bot circle --duration 120
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 2 --headless --bot circle --duration 120
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 3 --headless --bot circle --duration 120
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 4 --headless --bot circle --duration 120
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 5 --headless --bot circle --duration 120
+PASS concurrent joins: five distinct nonces and slots
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 6 --headless --bot circle --duration 3
+PASS sixth client rejected
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 6 --headless --bot circle --duration 120
+PASS explicit leave permits replacement
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 2 --headless --bot circle --duration 120
+PASS SIGKILL lease expiry permits rejoin
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 6 --headless --bot circle --duration 30 --fault spoof
+Traceback (most recent call last):
+  File "/mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/tests/gui_runtime_diagnostics.py", line 142, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/tests/gui_runtime_diagnostics.py", line 128, in main
+    return acceptance.main()
+           ^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/tests/p1_network.py", line 115, in main
+    assert stop(proc) == 0, f"Fault client {fault} shutdown failed"
+           ^^^^^^^^^^^^^^^
+AssertionError: Fault client spoof shutdown failed
+OBSERVED_EXIT=1
+
+```
+
+Actual failing client output:
+
+```text
+CLIENT_JOIN nonce=b0e79f31748542f8b093b68123a76db1 id=2 status=accepted
+CLIENT_SNAPSHOT tick=461 id=2 x=29000 y=30000 score=0 lives=3 vx=0 vy=0 distance_mm=0
+DDS_ACK_MATCH stage=before result=1 query_elapsed_ns=5549 clock_valid=1
+DDS_ACK_RESULT returned=-10 requested_ns=1000000000 elapsed_ns=1000571819 clock_valid=1
+DDS_SLOW_CALL op=acks elapsed_ns=1000571819 requested_ns=1000000000 returned=-10 before_dds_ns=1793818034401768788 after_dds_ns=1793818035402341248 before_rt_ns=1793818034401766247 after_rt_ns=1793818035402340960 delta_dds_ns=1000572460 delta_rt_ns=1000574713 clock_valid=1
+DDS_ACK_MATCH stage=after result=1 query_elapsed_ns=21354 clock_valid=1
+leave_ack: Timeout
+CLIENT_EXIT
+
+```
+
+Before/after matched-subscription counts were1 for this failing writer too.
+Native ACK returned-10 after1000571819ns for a1000000000ns request; DDS and
+realtime deltas during that call were approximately1s and clock_valid=1.
+Other observed client ACKs in this comparison returned0 in roughly1.8-4us.
+The failure is not explained by a proven additional matched-reader count or
+by the older4.75s/50ms native waitset overshoot.
+
+Actual comparison server tail:
+
+```text
+SERVER_JOIN identity=2 id=3 status=accepted
+SERVER_LEAVE identity=2 id=3
+SERVER_LEAVE identity=6 id=2
+DDS_DIAGNOSTIC category=128 reason=decode function=q_omg_security_decode_rtps_message cause=classified
+SERVER_JOIN identity=6 id=2 status=accepted
+SERVER_DROP identity=6 reason=spoof
+SERVER_LEAVE identity=6 id=2
+SERVER_LEAVE identity=5 id=5
+SERVER_LEAVE identity=4 id=4
+SERVER_LEAVE identity=3 id=1
+DDS_SLOW_CALL op=delete elapsed_ns=1026692248
+SERVER_SUMMARY joins=8 rejects=1 leaves=7 timeouts=1 invalid=1 stale=0 peak=5 inputs=283 rate_hits=0 auth_failures=0 middleware_events=13 moves=1939 shots=164 destroyed=28 splits=12 hits=0 respawns=0 gameovers=0 restarts=0 wraps=0 snapshots=173 points=2080 ticks=540
+AUDIT_ROOT hash=9cb31423ed973b1be1c2fa4327fd84f9f6776ad05f15a6af3712a4de48c0cd54 records=21
+
+```
+
+### New clock observation: cause not yet established
+
+The fresh comparison audit has increasing hash-chain sequence numbers but a
+decreasing realtime reading across sequence16to17. Selected actual lines:
+
+```text
+seq=16 ns=1793818035774977702 identity=6 event=JOIN reason=admission previous=988cfeb8f737aef88d15d112717c35173a9eecd10c0e92d762daae909b64b9b8 hash=6f9e7f91b71842a77af18c2b647a90c26c54ef39dfef9341e6e1794d9cde1604
+seq=17 ns=1793818034347470698 identity=6 event=DROP reason=spoof previous=6f9e7f91b71842a77af18c2b647a90c26c54ef39dfef9341e6e1794d9cde1604 hash=35ef728f9300f8cc787bc63c98b3db4c2a06ada118d860bb821135adcc1a2ef6
+seq=18 ns=1793818034401339626 identity=6 event=LEAVE reason=explicit previous=35ef728f9300f8cc787bc63c98b3db4c2a06ada118d860bb821135adcc1a2ef6 hash=870e3eba8bb5cf6268fda67b064c8862a76c15bb0faf4cd3b47196c1a9766368
+
+```
+
+1793818035774977702ns to1793818034347470698ns is a backward difference of
+1427507004ns (1.427507004s). `audit_log.c` reads CLOCK_REALTIME under the audit
+mutex before serializing each sequence. This is an observed nonmonotonic walltime
+record, not proof of its underlying cause or that it caused the ACK timeout.
+Clocks agreeing during the later one-second ACK call does not rule out an earlier
+clock discontinuity. No clock was changed or timestamp clamped by the tester.
+A paired-clock observation during a controlled case needs separate authorization;
+it has not been run as part of this report.
+
+### Cleanup and honest acceptance status
+
+After each case, the read-only command
+`ps -C server -C client -o pid=,stat=,comm=` returned no process rows (exit1).
+No game process was left live at those observations. No GUI test, full-suite
+repetition or production repair was performed after the comparison failure.
+
+Isolated case: observed exit0, diagnostic PASS. Full P1 comparison: observed
+exit1, FAIL. P1/GUI acceptance remains incomplete; all prior P4 HIGH findings and
+submission requirements remain open. Full raw outputs, per-child logs, summary
+and read-only diagnostics remain under ignored `build/evidence/ack-resume-*`.
+The selected exact output above is retained in this tracked report so evidence
+is not lost merely because build artifacts are ignored.
+
+
+## Approved T1 fallback verification - 5 November 2026
+
+User approval: "Approved T1". Separate review confirmed only DDS_RETCODE_TIMEOUT following successful Leave write is downgraded to an explicit warning. Write errors, other ACK errors and cleanup errors remain fatal. No security, QoS, lease, wire-format or timeout changes. The native ACK problem remains a known limitation.
+
+Actual incremental client compile exit0; full compiler output: build/evidence/slim-t1-build.txt. Targeted native lifecycle run, no preload/thread cap: tests/p1_network.py --security-dir <private Linux bundle> --output-dir build/evidence/slim-t1-network1; exit0. Output includes PASS fresh server slot release per identity, PASS final fault slot permits replacement, SERVER_SUMMARY joins13 rejects1 leaves12 timeouts1 invalid4 stale1 peak5, and PASS lifecycle audit records36. One timeout is the intentional SIGKILL lease test. Complete output and exit file retained; this run did not emit the warning and alone did not exercise the fallback branch.
+
+Explicit test-only public API fixture tests/force_ack_timeout.c simulates DDS_RETCODE_TIMEOUT, without probing internals. Compiled with cc -std=gnu11 -Wall -Wextra -Werror -fPIC -shared; isolated tests/ack_probe.py --dds-markers build/force_ack_timeout.so --output-dir build/evidence/slim-t1-forced-timeout exited0. Actual output: CLIENT_WARNING leave_ack_timeout: transport acknowledgement unconfirmed; server slot release requires independent verification; CLIENT_EXIT; server_leave_observed true; audit_leave_observed true; client_cleanup_exit0; server_cleanup_exit0; status PASS. This establishes application handling of an injected timeout, not native ACK reliability. Full output: build/evidence/slim-t1-forced-timeout-output.txt.
+
+T1 approved fallback implemented and targeted checks passed; T2 reproduction pending. Existing unsuppressed dependency findings and all historical failures remain disclosed.
+
+
+## T2/T3 slim checkpoint - 5 November 2026
+
+T2 fresh clone plus current working patch: build/unit/hardening exit0; headless124.539seconds after both admissions, joins2/leaves2/timeouts0/invalid0, audit verified; strict GUI exit0, both new final screenshots inspected once with connected HUDs, ships and asteroids. Not a clean published final revision. Complete nonsecret output copied into docs/evidence/2026-11-05-slim-finish/. T3 docs/EVIDENCE.md uses existing results only, labels historical P2 results, records missing idle CPU/profiler data and all excluded work as limitations. Exact course perf commands prepared with explicit missing-binary prerequisite. STOP at T3 approval gate; no T4 capture work or T5 packaging yet. Native ACK reliability remains unproven despite approved application fallback. No new sanitizer runs or benchmarks.
+
+
+## T3 approved; explicit manual guide and capture preparation - 5 November 2026
+
+User: "approved, but with a catch. show me how to start the game, with explicit instructions for me to test and verify. tell me exactly what you did , instructions to build and run the program." Read current launch scripts and actual key bindings. Added RUN_AND_VERIFY.md with exact Ubuntu build, credential, server/client terminal commands, observable human checklist, targeted lifecycle reproduction, managed shortcut/stop distinction and source-ZIP instructions. README stale failure-only banners replaced with current evidence and limitations; no application changes this turn.
+
+T4 one targeted capture-helper update: old P0 snaplen256/count10000 replaced by snaplen65535/count4000, accurate secure-game guidance; original ownership/mode/no-overwrite safeguards preserved. Offline tests: PASS bash syntax; PASS invalid duration/path rejected before capture; PASS offline IPv4 RTPS filter: 1 matching packet, complete2042bytes, non-RTPS excluded; exit0. This is synthetic fixture evidence only, not encryption or privileged capture evidence. Full output docs/evidence/2026-11-05-slim-finish/slim-t4-capture-check.txt. Human live capture and subsequent unprivileged analysis remain required. No full suite, benchmark, sanitizer or GUI rerun this turn.
+
+
+## User-requested automatic launcher and lecturer checklist test - 5 November 2026
+
+See REQUIREMENTS_CHECK.md and docs/evidence/2026-11-05-requirements/. Real play_local.sh --duration45 under isolated software-GL Xvfb passed two admissions/windows, real key input, fresh shared state, first-client Leave and session exit0: joins2 leaves2 timeouts0 invalid0 peak2 moves1627 shots14 snapshots310. Both new final screenshots inspected once. Actual WSL and OpenGL/GLFW/DDS linkage confirmed; no remaining game/Xvfb process rows.
+
+Targeted authentication first attempt FAILED due to my identity2 fixture selection: rogue_client2.crt missing, so no server auth-warning audit. Preserved and reported. One test-setup correction selected generated rogue identity6: wrong-ca and no-cert rejected exit1 while a legitimate client stayed alive; no extra slots, auth_failures6, server audit verified, test exit0. No product/security/assertion change.
+
+Approval is limited to tested launcher/local multiplayer/certificate rejection. Cross-machine operation and external encryption capture remain unverified; cached-glyph/condition-wait concepts are confirmed but speedup/idleCPU is unmeasured. Known ACK/sanitizer limitations retained. No full-suite or sanitizer/benchmark rerun and no agent sudo. User's full requirement list is not yet approved.

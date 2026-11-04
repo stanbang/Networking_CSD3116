@@ -1,6 +1,4 @@
-> **Paused teammate checkpoint:** read [docs/HANDOVER.md](docs/HANDOVER.md). Active GUI lease loss is repaired in the latest run; overall acceptance still fails a native Leave ACK timeout. This is not a completed release.
-
-> Current local integration: fresh build/unit/hardening/headless lifecycle checks pass, but the secure two-window GUI check FAILED with lease loss and stale game state. See docs/INTEGRATION.md. Contributor historical passes below are not fresh verification on this host. Do not treat this as submission-ready.
+> **Current slim checkpoint, 5 November 2026:** [Exact build/run commands and human checklist](docs/RUN_AND_VERIFY.md). [Evidence and limitations](docs/EVIDENCE.md). T1 timeout-only fallback approved and verified; fresh clone plus uncommitted patch passed build/units/hardening,124.539-second two-client headless and one strict GUI check. Native Leave ACK reliability is still unproven. Historical failures and unsuppressed dependency findings are retained. No submission-ready claim.
 
 # DDS Asteroids
 
@@ -23,7 +21,7 @@ cd /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116
 bash tools/play_local.sh
 ```
 
-The launcher builds the game, prepares private Linux credentials and opens two separate player windows. Click a window to control that player. Closing either window ends this local session. Logs are in `build/local-*.log`. Default session limit is one hour; use `--duration 120` for two minutes. `--fresh-certs` regenerates the private fixture, and `--headless --duration 5` runs two terminal bots. The launcher itself and the actual two-window game have been tested separately; GUI evidence uses Xvfb/software OpenGL.
+The launcher builds the game, prepares private Linux credentials and opens two separate player windows. Click a window to control that player. Closing either window ends this local session. Logs and audit are in the printed unique `build/local-session.XXXXXXXX/` directory. Default session limit is one hour; use `--duration 120` for two minutes. `--fresh-certs` regenerates the private fixture, and `--headless --duration 5` runs two terminal bots. The launcher itself and the actual two-window game have been tested separately; GUI evidence uses Xvfb/software OpenGL.
 
 | Control | Action |
 |---|---|
@@ -125,7 +123,7 @@ This is a prerequisite for investigation, not a promised fix. Agents did not ins
 
 `src/common` holds simulation, protocol, snapshots, security and audit; `src/server` owns authoritative state; `src/client` owns rendering/input and snapshot history. `idl` holds bounded wire types, `tests` contains behavior/negative harnesses, and `tools` contains setup/provisioning/launch/check helpers.
 
-AI assistance was used and must be declared in the zip, slides and video. `docs/AI_USAGE.md` records generated work, independent review and actual testing. Team names, contributions, human narrated video and final slide authorship remain for the team to fill in; no human contribution is invented.
+AI assistance was used and must be declared in the zip, slides and video. `docs/AI_USAGE.md` records generated work, independent review and actual testing. Team: Stanley Lur (leader), Jordain Ng; no team name. Actual contributions, human narrated video and final slide authorship remain for the team to fill in; no human contribution is invented.
 
 
 ## Current local integration
@@ -133,3 +131,14 @@ AI assistance was used and must be declared in the zip, slides and video. `docs/
 See docs/INTEGRATION.md before relying on historical test claims. Current controls are `bash tools/play.sh --security-dir <PRIVATE_LINUX_BUNDLE>` and `bash tools/stop.sh`; explicit `--baseline` retains the P0 reference. Game sessions retain unique logs. Existing explicit audit paths are never overwritten; choose a fresh path, or omit --audit-file for a unique default. The original contributor play_local.sh remains available.
 
 Team: Stanley Lur (leader), Jordain Ng; no team name. Module responsibilities are supplied by the team, not inferred from AI-generated code.
+
+
+## Current finish-mode limitations and submission preparation
+
+- Leave ACK reliability is unresolved. With explicit user approval, only a transport ACK timeout after a successful Leave write warns and permits normal exit. Other errors remain fatal. Fresh server slot-release events and replacement joins are independently tested; a client warning does not prove receipt.
+- Existing TSan dependency race/mutex-lifetime and Valgrind uninitialized crypto-send findings remain open, unsuppressed and outside this finish scope. Current runs do not establish sanitizer cleanliness.
+- Current configuration is same-machine domain42/loopback. Two-computer/LAN/VPN testing, further GUI investigation, slides and video production are outside this finish scope and remain team requirements/limitations.
+- External packet confidentiality evidence is pending the user's actual capture and unprivileged analysis. The helper's offline checks are not ciphertext proof. Controlled idle CPU comparisons and hardware perf measurements are absent.
+- Fresh-source verification used GitHub base3dae8e3 plus the current uncommitted working patch. The latest changes are not claimed to be published or part of a final committed archive.
+
+[RUN_AND_VERIFY.md](docs/RUN_AND_VERIFY.md) contains exact terminal commands, manual checks, capture instructions and source-ZIP instructions. Review/commit intended source changes with GitHub Desktop first; archive that reviewed commit only after the explicit filename-exclusion check. Keep credential bundles, private keys/PEM, build output and captures outside the ZIP. Inspect and build a fresh extraction before submission; no final ZIP or submission has been claimed.

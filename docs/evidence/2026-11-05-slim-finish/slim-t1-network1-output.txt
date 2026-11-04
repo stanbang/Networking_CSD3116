@@ -1,0 +1,40 @@
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/server --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --duration 180 --audit-file /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/evidence/slim-t1-network1/server-audit.log
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 1 --headless --bot circle --duration 120
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 2 --headless --bot circle --duration 120
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 3 --headless --bot circle --duration 120
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 4 --headless --bot circle --duration 120
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 5 --headless --bot circle --duration 120
+PASS concurrent joins: five distinct nonces and slots
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 6 --headless --bot circle --duration 3
+PASS sixth client rejected
+PASS fresh server slot release identity=1
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 6 --headless --bot circle --duration 120
+PASS explicit leave permits replacement
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 2 --headless --bot circle --duration 120
+PASS fresh server slot release identity=2
+PASS fresh server slot release identity=6
+PASS SIGKILL lease expiry permits rejoin
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 6 --headless --bot circle --duration 30 --fault spoof
+PASS fresh server slot release identity=6
+PASS SERVER_DROP identity=6 reason=spoof
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 6 --headless --bot circle --duration 30 --fault session
+PASS fresh server slot release identity=6
+PASS SERVER_DROP identity=6 reason=session
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 6 --headless --bot circle --duration 30 --fault id-zero
+PASS fresh server slot release identity=6
+PASS SERVER_DROP identity=6 reason=id-zero
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 6 --headless --bot circle --duration 30 --fault id-high
+PASS fresh server slot release identity=6
+PASS SERVER_DROP identity=6 reason=id-high
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 6 --headless --bot circle --duration 30 --fault replay
+PASS fresh server slot release identity=6
+PASS SERVER_DROP identity=6 reason=replay
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 6 --headless --bot circle --duration 120
+PASS fresh server slot release identity=6
+PASS final fault slot permits replacement
+PASS fresh server slot release identity=3
+PASS fresh server slot release identity=4
+PASS fresh server slot release identity=5
+SERVER_SUMMARY joins=13 rejects=1 leaves=12 timeouts=1 invalid=4 stale=1 peak=5 inputs=368 rate_hits=0 auth_failures=0 middleware_events=16 moves=2482 shots=211 destroyed=32 splits=16 hits=0 respawns=0 gameovers=0 restarts=0 wraps=0 snapshots=228 points=2160 ticks=712
+PASS lifecycle audit records=36 root=80738599fcf84df4e1703acfd950670738dd686e381a86d360047f8ca666195f
+PASS P1 networking lifecycle and malformed-message counters

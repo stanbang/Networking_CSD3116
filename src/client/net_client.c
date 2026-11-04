@@ -182,14 +182,21 @@ static bool network_init(Client *str_client, Network *str_net)
         event_queue_mark(&str_net->str_events, 0) && event_queue_mark(&str_net->str_events, 1);
 }
 
-/* Reliable leave is acknowledged before participant teardown, outside all locks. */
+/* Await transport ACK outside locks. The approved timeout fallback does not
+ * prove server receipt; lifecycle tests independently verify slot release. */
 static bool send_leave(Network *str_net)
 {
     if (!str_net->int_player_id) return true;
     Ast_Leave str_leave = {.int_version = AST_VERSION, .int_seq = ++str_net->int_seq,
         .int_session = str_net->int_session, .int_player_id = (uint16_t)str_net->int_player_id};
-    return dds_ok(dds_write(str_net->int_leave, &str_leave), "leave_write") &&
-        dds_ok(dds_wait_for_acks(str_net->int_leave, DDS_SECS(1)), "leave_ack");
+    if (!dds_ok(dds_write(str_net->int_leave, &str_leave), "leave_write")) return false;
+    dds_return_t int_result = dds_wait_for_acks(str_net->int_leave, DDS_SECS(1));
+    if (int_result == DDS_RETCODE_TIMEOUT) {
+        fputs("CLIENT_WARNING leave_ack_timeout: transport acknowledgement unconfirmed; "
+              "server slot release requires independent verification\n", stderr);
+        return true; /* User-approved limitation, 2026-11-05; other errors fail. */
+    }
+    return dds_ok(int_result, "leave_ack");
 }
 
 /* Sole DDS I/O owner: bounded monotonic condition wait, notified by native listeners. */

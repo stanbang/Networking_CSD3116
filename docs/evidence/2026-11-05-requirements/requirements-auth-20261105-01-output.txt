@@ -1,0 +1,7 @@
+PASS wrong-ca: no admission, client exit=1, legitimate peer remains alive
+PASS no-cert: no admission, client exit=1, legitimate peer remains alive
+Traceback (most recent call last):
+  File "/mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/evidence/requirements-auth-20261105-01.py", line 34, in <module>
+    assert 'DDS_AUTH_WARNING' in audit,'No authentication rejection audit evidence'
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: No authentication rejection audit evidence

@@ -1,0 +1,24 @@
+mkdir -p build/release
+cc -std=gnu11 -O2 -g -Wall -Wextra -Wformat=2 -Wformat-security -fstack-protector-strong -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 -fPIE  -Isrc -Ibuild/gen -isystem third_party   tests/test_protocol.c src/common/audit_log.c src/common/event_queue.c src/common/frame.c src/common/net.c src/common/options.c src/common/protocol.c src/common/security.c src/common/sim.c build/gen/messages.c -o build/release/test-protocol -pie -Wl,-z,relro,-z,now,-z,noexecstack  -lddsc  -lssl -lcrypto  -pthread -lm
+mkdir -p build/release
+cc -std=gnu11 -O2 -g -Wall -Wextra -Wformat=2 -Wformat-security -fstack-protector-strong -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 -fPIE  -Isrc -Ibuild/gen -isystem third_party tests/test_sim.c src/common/sim.c -o build/release/test-sim -pie -Wl,-z,relro,-z,now,-z,noexecstack  -lm
+mkdir -p build/release
+cc -std=gnu11 -O2 -g -Wall -Wextra -Wformat=2 -Wformat-security -fstack-protector-strong -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 -fPIE  -Isrc -Ibuild/gen -isystem third_party   tests/test_event_queue.c src/common/audit_log.c src/common/event_queue.c src/common/frame.c src/common/net.c src/common/options.c src/common/protocol.c src/common/security.c src/common/sim.c build/gen/messages.c -o build/release/test-event-queue -pie -Wl,-z,relro,-z,now,-z,noexecstack  -lddsc  -lssl -lcrypto  -pthread -lm
+./build/release/test-protocol
+PASS malformed bullet/asteroid/health snapshot boundaries
+AUDIT_FILE /tmp/asteroids-audit-test.hurIn4/evidence
+AUDIT_ROOT hash=0000000000000000000000000000000000000000000000000000000000000000 records=0
+PASS audit exclusive creation and symlink target preservation
+PASS protocol boundaries and CLI validation
+./build/release/test-sim
+PASS sim wrap, speed limit and rotation
+PASS sim fire cadence, full bullet pool and leave cleanup
+PASS sim splitting, owner score and seam collision
+PASS sim damage, exact respawn delay and invulnerability
+PASS sim game-over and explicit restart
+PASS sim capped split pool and guard words
+PASS independent simulation behavior fixtures
+./build/release/test-event-queue
+PASS queued wake, coalescing, bounded tags and explicit requeue
+PASS no-event monotonic timeout elapsed_ns=51575652
+PASS asynchronous producer wake and safe queue teardown

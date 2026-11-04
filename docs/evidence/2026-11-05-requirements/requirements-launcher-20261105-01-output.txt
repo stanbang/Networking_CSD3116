@@ -1,0 +1,9 @@
+SCREENSHOT /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/evidence/requirements-launcher-20261105-01/client1-launcher.png
+SCREENSHOT /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/evidence/requirements-launcher-20261105-01/client2-launcher.png
+FRESH_STATE client=1 observed_age_seconds=1.667
+FRESH_STATE client=2 observed_age_seconds=0.911
+LIVE_STATE client=1 id=1 samples=15 first_tick=43 last_tick=901
+LIVE_STATE client=2 id=2 samples=14 first_tick=83 last_tick=879
+PASS automatic launcher: server first, two admitted distinct GUI clients, real key input, fresh state >10s
+SERVER_SUMMARY joins=2 rejects=0 leaves=2 timeouts=0 invalid=0 stale=0 peak=2 inputs=288 rate_hits=0 auth_failures=0 middleware_events=0 moves=1627 shots=14 destroyed=3 splits=3 hits=0 respawns=0 gameovers=0 restarts=0 wraps=0 snapshots=310 points=90 ticks=944
+PASS client Leave received; automatic session shutdown exit0

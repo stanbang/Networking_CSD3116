@@ -77,6 +77,20 @@ def main():
         return start(name, command)
 
     accepted = r"CLIENT_JOIN nonce=([0-9a-fA-F]{32}) id=([1-5]) status=accepted"
+
+    def graceful(proc, identity):
+        """Exit zero alone is insufficient: require a fresh server slot-release event."""
+        evidence = audit if security else server_log
+        pattern = (rf"identity={identity} event=LEAVE reason=explicit\b" if security else
+                   rf"SERVER_LEAVE identity={identity} id=[1-5]\b")
+        before = len(re.findall(pattern, evidence.read_text()))
+        assert stop(proc) == 0, f"Identity {identity} shutdown failed"
+        deadline = time.monotonic() + 3.5
+        while len(re.findall(pattern, evidence.read_text())) <= before:
+            assert server.poll() is None, "Server exited before slot release evidence"
+            assert time.monotonic() < deadline, f"Identity {identity}: no fresh Leave/slot release"
+            time.sleep(.05)
+        print(f"PASS fresh server slot release identity={identity}", flush=True)
     try:
         server, server_log = start("server", [binaries / "server", *security, "--duration", 180,
                                                "--audit-file", audit])
@@ -91,7 +105,7 @@ def main():
         stop(sixth)
         print("PASS sixth client rejected", flush=True)
 
-        assert stop(initial[0][0]) == 0, "Graceful leaving client failed"
+        graceful(initial[0][0], 1)
         time.sleep(0.4)
         replacement, path = client("after-leave", 6)
         wait_line(path, accepted, replacement)
@@ -102,8 +116,8 @@ def main():
         rejoined, path = client("after-crash", 2)
         reclaimed = wait_line(path, accepted, rejoined)
         assert reclaimed.group(2) == joins[1].group(2), "Killed player's slot was not reclaimed"
-        assert stop(rejoined) == 0, "Rejoined client leave failed"
-        assert stop(replacement) == 0, "Replacement leave failed"
+        graceful(rejoined, 2)
+        graceful(replacement, 6)
         print("PASS SIGKILL lease expiry permits rejoin", flush=True)
 
         for fault in ("spoof", "session", "id-zero", "id-high", "replay"):
@@ -112,11 +126,15 @@ def main():
             event = wait_line(server_log, rf"SERVER_DROP identity=6 reason={fault}\b", server)
             if security:
                 wait_line(audit, rf"identity=6 event=DROP reason={fault}\b", server)
-            assert stop(proc) == 0, f"Fault client {fault} shutdown failed"
+            graceful(proc, 6)
             print(f"PASS {event.group(0)}", flush=True)
-        for proc, _ in initial[2:]:
+        final_client, path = client("after-last-fault", 6)
+        wait_line(path, accepted, final_client)
+        graceful(final_client, 6)
+        print("PASS final fault slot permits replacement", flush=True)
+        for identity, (proc, _) in enumerate(initial[2:], 3):
             assert proc.poll() is None, "Legitimate client died during faults"
-            assert stop(proc) == 0, "Legitimate client shutdown failed"
+            graceful(proc, identity)
         assert stop(server) == 0, "Server shutdown failed"
         summary = re.search(r"SERVER_SUMMARY ([^\n]+)", server_log.read_text())
         assert summary, "Missing machine-readable server summary"

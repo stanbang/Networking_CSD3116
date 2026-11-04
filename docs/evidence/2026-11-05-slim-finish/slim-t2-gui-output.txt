@@ -1,0 +1,12 @@
+SCREENSHOT /home/stanley/.local/state/dds-asteroids/slim-check-20261105-01/gui/client1-before.png
+SCREENSHOT /home/stanley/.local/state/dds-asteroids/slim-check-20261105-01/gui/client2-before.png
+SCREENSHOT /home/stanley/.local/state/dds-asteroids/slim-check-20261105-01/gui/client1-after-input.png
+SCREENSHOT /home/stanley/.local/state/dds-asteroids/slim-check-20261105-01/gui/client2-after-input.png
+SCREENSHOT /home/stanley/.local/state/dds-asteroids/slim-check-20261105-01/gui/client1-10s.png
+SCREENSHOT /home/stanley/.local/state/dds-asteroids/slim-check-20261105-01/gui/client2-10s.png
+FRESH_STATE client=1 observed_age_seconds=1.279
+FRESH_STATE client=2 observed_age_seconds=0.673
+LIVE_STATE client=1 id=1 samples=12 first_tick=69 last_tick=743
+LIVE_STATE client=2 id=2 samples=11 first_tick=105 last_tick=719
+SERVER_SUMMARY joins=2 rejects=0 leaves=2 timeouts=0 invalid=0 stale=0 peak=2 inputs=222 rate_hits=0 auth_failures=0 middleware_events=4 moves=747 shots=12 destroyed=3 splits=3 hits=2 respawns=2 gameovers=0 restarts=0 wraps=0 snapshots=253 points=90 ticks=772
+PASS secure two-GUI lifecycle, real key input and >=10s rendering; inspect screenshots

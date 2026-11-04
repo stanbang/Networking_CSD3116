@@ -183,18 +183,43 @@ dds_return_t dds_delete(dds_entity_t int_entity)
     return int_result;
 }
 
+/* Public count-only query: no subscription handles, GUIDs or samples are read.
+ * Each query is timed separately and remains outside the native ACK timing span.
+ * A negative result is a native query failure, never interpreted as a count.
+ */
+static void ack_matches(dds_entity_t int_writer, const char *str_stage)
+{
+    uint64_t int_started = now_ns();
+    dds_return_t int_result = dds_get_matched_subscriptions(int_writer, NULL, 0);
+    uint64_t int_finished = now_ns();
+    bool b_valid = int_started && int_finished >= int_started;
+    fprintf(stderr, "DDS_ACK_MATCH stage=%s result=%" PRId32
+            " query_elapsed_ns=%" PRIu64 " clock_valid=%u\n",
+            str_stage, (int32_t)int_result,
+            b_valid ? int_finished - int_started : UINT64_C(0),
+            (unsigned int)b_valid);
+}
 /* A received Leave is not proof that every matched reliable reader ACK arrived. */
 dds_return_t dds_wait_for_acks(dds_entity_t int_writer, dds_duration_t int_timeout)
 {
     int int_errno_before = errno;
+    ack_matches(int_writer, "before");
     Marker str_mark = mark_begin("ast.acks");
     WallClocks str_before = wall_now();
     errno = int_errno_before;
+    str_mark.int_started = now_ns();
     dds_return_t int_result = str_real_acks(int_writer, int_timeout);
     int int_errno_after = errno;
     uint64_t int_finished = now_ns();
     WallClocks str_after = wall_now();
+    bool b_clock_valid = str_mark.int_started && int_finished >= str_mark.int_started;
+    fprintf(stderr, "DDS_ACK_RESULT returned=%" PRId32 " requested_ns=%" PRId64
+            " elapsed_ns=%" PRIu64 " clock_valid=%u\n",
+            (int32_t)int_result, (int64_t)int_timeout,
+            b_clock_valid ? int_finished - str_mark.int_started : UINT64_C(0),
+            (unsigned int)b_clock_valid);
     mark_timed_end(&str_mark, "acks", int_timeout, int_result, int_finished, str_before, str_after);
+    ack_matches(int_writer, "after");
     errno = int_errno_after;
     return int_result;
 }

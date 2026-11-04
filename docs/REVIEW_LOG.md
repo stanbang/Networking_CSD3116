@@ -440,3 +440,42 @@ The merged implementation and all local work remain preserved. P1 integration ac
 
 ## Paused teammate checkpoint
 User explicitly paused goal dueusage and authorized handover+commit/push. HANDOVER.md is current; selected actual nonsecret output copied under docs/evidence/2026-11-04-handover/ because build/ is ignored. Native ACK diagnostic measured requested1e9ns elapsed1000082330ns result-10; this is not a waitset overshoot. Latest active GUI has timeouts0/invalid0/freshconnected state, but overall network and GUI remain FAIL during ACK shutdown. No game tests/repairs ran afterpause, no private material included, no completion claim.
+
+
+## Independent ACK diagnostic review, 5 November 2026
+
+Read-only chronology review found no direct application Leave-reader teardown race: client net_client.c186-192 writes then waits on the Leave writer;215-217 waits before listener removal. Server net_server.c211 creates fixed per-identity Leave readers, retained until worker cleanup265;196 returns acquired loans. EventQueue releases its queue lock before DDS work and its callback only marks readiness. These observations do not establish the native runtime cause.
+
+Independently reviewed tests/dds_call_markers.c matching-count/ACK-result diagnostic and tests/ack_probe.py. No blocking issue found: installed /usr/include/dds/dds.h4358-4391 explicitly permits dds_get_matched_subscriptions(writer,NULL,0); negative query results stay negative, both query durations are separate from the native ACK timing span, and forwarded arguments/result/errno are preserved. ACK_RESULT records successes as well as failures. No handles, GUIDs, payloads, raw traces or private keys are emitted. Requested minor refinement: start the ACK monotonic span immediately before its native call after thread-label/clock setup, so setup overhead is excluded; builder is applying this before compilation. No runtime pass is inferred from review.
+
+The isolated harness requires a fresh output directory and exclusive process-log creation; starts one server then identity6 client; waits for actual admission, spoof rejection and own snapshot; requests normal SIGTERM while server remains alive; requires client exit0, server normal cleanup exit0, server summary, and application/audit Leave observations. It checks server alive immediately and two seconds after client exit. Cleanup signals only retained Popen children, waits finitely and records forced kills. SIGKILL cleanup cannot satisfy client_exit0 or server_cleanup_exit0. PASS here is only an isolated shutdown diagnostic, not full P1 acceptance, cryptographic audit-chain verification or packet-capture proof. No reviewer game processes or tests were run for this source review.
+
+Optional next evidence: native trace sink can count exact HB/ACK/decode-failure metadata without raw output, but such counters are global and cannot attribute a packet to Leave. Installed ddsrt/log.h documents synchronous sink replacement. A safe interceptor must preserve original callback/userdata, forward once, keep immutable context until replacement returns, serialize registrations outside callbacks, preserve errno, and never invoke DDS/logging recursively from the sink. Fragmented trace correlation must not use global last-GUID state across threads. No trace interceptor was approved as a production fix, and no production security/QoS/deadline/IDL change was reviewed here. Overall ACK timeout and P4 HIGH findings remain open.
+
+
+
+## Approved T1 fallback verification - 5 November 2026
+
+User approval: "Approved T1". Separate review confirmed only DDS_RETCODE_TIMEOUT following successful Leave write is downgraded to an explicit warning. Write errors, other ACK errors and cleanup errors remain fatal. No security, QoS, lease, wire-format or timeout changes. The native ACK problem remains a known limitation.
+
+Actual incremental client compile exit0; full compiler output: build/evidence/slim-t1-build.txt. Targeted native lifecycle run, no preload/thread cap: tests/p1_network.py --security-dir <private Linux bundle> --output-dir build/evidence/slim-t1-network1; exit0. Output includes PASS fresh server slot release per identity, PASS final fault slot permits replacement, SERVER_SUMMARY joins13 rejects1 leaves12 timeouts1 invalid4 stale1 peak5, and PASS lifecycle audit records36. One timeout is the intentional SIGKILL lease test. Complete output and exit file retained; this run did not emit the warning and alone did not exercise the fallback branch.
+
+Explicit test-only public API fixture tests/force_ack_timeout.c simulates DDS_RETCODE_TIMEOUT, without probing internals. Compiled with cc -std=gnu11 -Wall -Wextra -Werror -fPIC -shared; isolated tests/ack_probe.py --dds-markers build/force_ack_timeout.so --output-dir build/evidence/slim-t1-forced-timeout exited0. Actual output: CLIENT_WARNING leave_ack_timeout: transport acknowledgement unconfirmed; server slot release requires independent verification; CLIENT_EXIT; server_leave_observed true; audit_leave_observed true; client_cleanup_exit0; server_cleanup_exit0; status PASS. This establishes application handling of an injected timeout, not native ACK reliability. Full output: build/evidence/slim-t1-forced-timeout-output.txt.
+
+T1 approved fallback implemented and targeted checks passed; T2 reproduction pending. Existing unsuppressed dependency findings and all historical failures remain disclosed.
+
+
+## T3 approved; explicit manual guide and capture preparation - 5 November 2026
+
+User: "approved, but with a catch. show me how to start the game, with explicit instructions for me to test and verify. tell me exactly what you did , instructions to build and run the program." Read current launch scripts and actual key bindings. Added RUN_AND_VERIFY.md with exact Ubuntu build, credential, server/client terminal commands, observable human checklist, targeted lifecycle reproduction, managed shortcut/stop distinction and source-ZIP instructions. README stale failure-only banners replaced with current evidence and limitations; no application changes this turn.
+
+T4 one targeted capture-helper update: old P0 snaplen256/count10000 replaced by snaplen65535/count4000, accurate secure-game guidance; original ownership/mode/no-overwrite safeguards preserved. Offline tests: PASS bash syntax; PASS invalid duration/path rejected before capture; PASS offline IPv4 RTPS filter: 1 matching packet, complete2042bytes, non-RTPS excluded; exit0. This is synthetic fixture evidence only, not encryption or privileged capture evidence. Full output docs/evidence/2026-11-05-slim-finish/slim-t4-capture-check.txt. Human live capture and subsequent unprivileged analysis remain required. No full suite, benchmark, sanitizer or GUI rerun this turn.
+
+
+## User-requested automatic launcher and lecturer checklist test - 5 November 2026
+
+See REQUIREMENTS_CHECK.md and docs/evidence/2026-11-05-requirements/. Real play_local.sh --duration45 under isolated software-GL Xvfb passed two admissions/windows, real key input, fresh shared state, first-client Leave and session exit0: joins2 leaves2 timeouts0 invalid0 peak2 moves1627 shots14 snapshots310. Both new final screenshots inspected once. Actual WSL and OpenGL/GLFW/DDS linkage confirmed; no remaining game/Xvfb process rows.
+
+Targeted authentication first attempt FAILED due to my identity2 fixture selection: rogue_client2.crt missing, so no server auth-warning audit. Preserved and reported. One test-setup correction selected generated rogue identity6: wrong-ca and no-cert rejected exit1 while a legitimate client stayed alive; no extra slots, auth_failures6, server audit verified, test exit0. No product/security/assertion change.
+
+Approval is limited to tested launcher/local multiplayer/certificate rejection. Cross-machine operation and external encryption capture remain unverified; cached-glyph/condition-wait concepts are confirmed but speedup/idleCPU is unmeasured. Known ACK/sanitizer limitations retained. No full-suite or sanitizer/benchmark rerun and no agent sudo. User's full requirement list is not yet approved.
