@@ -1,6 +1,10 @@
 /* Boundary checks fail with nonzero exit through assertions. Author: <team>, Codex assistance. Date: 2026-11-03. */
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include "common/audit_log.h"
 #include "common/protocol.h"
 
 /* Missing and malformed handshakes must not allocate or adopt a slot. */
@@ -97,10 +101,33 @@ static void entity_cases(void)
     puts("PASS malformed bullet/asteroid/health snapshot boundaries");
 }
 
+/* Existing evidence and symlink targets survive rejected log creation. */
+static void audit_creation_cases(void)
+{
+    char str_dir[] = "/tmp/asteroids-audit-test.XXXXXX";
+    assert(mkdtemp(str_dir));
+    char str_path[256], str_link[256], str_text[32] = {0};
+    assert(snprintf(str_path, sizeof(str_path), "%s/evidence", str_dir) > 0);
+    assert(snprintf(str_link, sizeof(str_link), "%s/link", str_dir) > 0);
+    Audit str_first = {0}, str_rejected = {0};
+    assert(audit_open(&str_first, str_path));
+    assert(!audit_open(&str_rejected, str_path));
+    assert(audit_close(&str_first));
+    FILE *str_file = fopen(str_path, "w"); assert(str_file);
+    assert(fputs("KEEP EVIDENCE\n", str_file) >= 0); assert(fclose(str_file) == 0);
+    assert(symlink(str_path, str_link) == 0);
+    assert(!audit_open(&str_rejected, str_link));
+    str_file = fopen(str_path, "r"); assert(str_file);
+    assert(fgets(str_text, sizeof(str_text), str_file)); assert(fclose(str_file) == 0);
+    assert(strcmp(str_text, "KEEP EVIDENCE\n") == 0);
+    assert(unlink(str_link) == 0); assert(unlink(str_path) == 0); assert(rmdir(str_dir) == 0);
+    puts("PASS audit exclusive creation and symlink target preservation");
+}
+
 /* Assertions intentionally abort with nonzero status on validation regressions. */
 int main(void)
 {
-    handshake_cases(); input_cases(); snapshot_cases(); entity_cases();
+    handshake_cases(); input_cases(); snapshot_cases(); entity_cases(); audit_creation_cases();
     /* Regression: worker receives heartbeat after main sampled its tick time. */
     assert(!lease_expired(100, 101));
     assert(!lease_expired(AST_LEASE_NS - 1, 0));

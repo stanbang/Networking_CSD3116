@@ -13,6 +13,9 @@
 #define AST_HEARTBEAT_NS UINT64_C(100000000)
 #define AST_JOIN_NS UINT64_C(500000000)
 #define AST_BATCH 16
+/* Join/Input/Leave callbacks per trusted identity; 32-bit coalescing mask. */
+#define AST_EVENT_CHANNELS (AST_IDENTITIES * 3u)
+#define AST_EVENT_WAIT_NS UINT64_C(50000000)
 #define AST_JOIN_HISTORY 64
 #define AST_MAX_DURATION 86400u
 #define AST_JOIN_RATE 5u

@@ -1,3 +1,7 @@
+# Latest integration status: GUI verification blocked
+
+See the current blocker section below. Existing build/unit/headless passes are narrower than full graphical multiplayer acceptance.
+
 # Independent review log
 
 Purpose: P0 code and evidence review. Author: Codex reviewer (team names pending). Date: 2026-11-03.
@@ -416,3 +420,23 @@ All real agents hit quota. Root re-read final sources, reviewed actual test harn
 - Existing MEDIUM reconnect-history64 bound, LOW HUD overlap and untested LAN/human feel remain documented. New gameplay code had no open HIGH/CRITICAL at P3 acceptance; these later dependency findings mean overall project verification is not complete.
 
 Exact failed/passed commands and raw excerpts are in TEST_REPORT. P0–P3 playable foundation/game complete; P4 partial; P5/P6 not started. Do not conflate game implementation with full security/memory certification.
+
+
+## Local main integration,4November2026
+
+See INTEGRATION.md. Source2cad2e1 fast-forwarded after preserving localP0 history/bytes; nativeA/IDL/P1 integration authorized by user. Independent agents compiled/reviewed/ran initial failedP1 test, then usage limits caused SUBAGENTS_UNAVAILABLE sequential fallback. Fallback fixed audit overwriting with a real preservation regression and strengthened fresh-output/join-aware fault tests; actual diff reread before checks. Units passed; networkingrun3 passed but original shutdownhang stays unresolved. No sudo/commit/push, no privatekeys inrepo. P4 HIGHs and P5/P6 work remain.
+
+
+## Current blocker: real secure GUI acceptance failed
+
+Actual `xvfb-run ... tests/p3_gui.py --security-dir <persistent Linux bundle> --output-dir build/evidence/integration-gui-run1` exited1. Both windows rendered, but the server summary had joins2, peak1, timeouts2, inputs5, moves0, shots0, snapshots40, ticks1500. The first lease expired before the second player joined. Both final PNGs show WAITING FOR GAME STATE rather than a current connected two-player world. Root inspected both actual images. This contradicts accepting the merged game as working locally on this host, regardless of contributor historical reports. It is not cleared by the headless run3 pass.
+
+Evidence: build/evidence/integration-gui-output.txt, integration-gui-exit.txt, integration-gui-run1/*.log and client1-10s.png/client2-10s.png. Cleanup completed; no successful manual GUI session is currently left open. Do not fabricate a manual-phase pass or open the game as if all own checks passed.
+
+The current bounded integration attempt cycle is stopped at the original maximum-three-attempt rule. The middle missing-/tmp-bundle prerequisite failure is disclosed, not silently erased to extend the limit. Request a human decision to authorize a new targeted GUI/network starvation/hang investigation cycle. No fourth network attempt or second GUI attempt has been run. A diagnosis is not established: do not label native dependency, GPU, clock, or the harness as the cause without stronger evidence.
+
+The merged implementation and all local work remain preserved. P1 integration acceptance is INCOMPLETE despite passing headless functionality. Native-security and P3 source exist; P2/P3 have not been newly accepted here. P4 OPEN HIGH TSan/Valgrind findings, full soak, external capture, two-machine verification, P5 measurements and P6 deliverables remain required by the original scope/PDF checklist.
+
+
+## Paused teammate checkpoint
+User explicitly paused goal dueusage and authorized handover+commit/push. HANDOVER.md is current; selected actual nonsecret output copied under docs/evidence/2026-11-04-handover/ because build/ is ignored. Native ACK diagnostic measured requested1e9ns elapsed1000082330ns result-10; this is not a waitset overshoot. Latest active GUI has timeouts0/invalid0/freshconnected state, but overall network and GUI remain FAIL during ACK shutdown. No game tests/repairs ran afterpause, no private material included, no completion claim.

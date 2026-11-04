@@ -1,3 +1,7 @@
+> **Paused teammate checkpoint:** read [docs/HANDOVER.md](docs/HANDOVER.md). Active GUI lease loss is repaired in the latest run; overall acceptance still fails a native Leave ACK timeout. This is not a completed release.
+
+> Current local integration: fresh build/unit/hardening/headless lifecycle checks pass, but the secure two-window GUI check FAILED with lease loss and stale game state. See docs/INTEGRATION.md. Contributor historical passes below are not fresh verification on this host. Do not treat this as submission-ready.
+
 # DDS Asteroids
 
 Secure, server-authoritative co-op Asteroids in C, using Cyclone DDS, OpenGL, GLFW and OpenSSL. CSD3116, DigiPen SIT. Author: <team>, with declared Codex assistance; updated 2026-11-04.
@@ -9,13 +13,13 @@ Secure, server-authoritative co-op Asteroids in C, using Cyclone DDS, OpenGL, GL
 Run this in Windows Command Prompt or PowerShell:
 
 ```cmd
-wsl -d Ubuntu --cd /mnt/c/Users/jorda/Desktop/Networking_CSD3116 -- bash tools/play_local.sh
+wsl -d Ubuntu --cd /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116 -- bash tools/play_local.sh
 ```
 
 Or, inside Ubuntu:
 
 ```bash
-cd /mnt/c/Users/jorda/Desktop/Networking_CSD3116
+cd /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116
 bash tools/play_local.sh
 ```
 
@@ -122,3 +126,10 @@ This is a prerequisite for investigation, not a promised fix. Agents did not ins
 `src/common` holds simulation, protocol, snapshots, security and audit; `src/server` owns authoritative state; `src/client` owns rendering/input and snapshot history. `idl` holds bounded wire types, `tests` contains behavior/negative harnesses, and `tools` contains setup/provisioning/launch/check helpers.
 
 AI assistance was used and must be declared in the zip, slides and video. `docs/AI_USAGE.md` records generated work, independent review and actual testing. Team names, contributions, human narrated video and final slide authorship remain for the team to fill in; no human contribution is invented.
+
+
+## Current local integration
+
+See docs/INTEGRATION.md before relying on historical test claims. Current controls are `bash tools/play.sh --security-dir <PRIVATE_LINUX_BUNDLE>` and `bash tools/stop.sh`; explicit `--baseline` retains the P0 reference. Game sessions retain unique logs. Existing explicit audit paths are never overwritten; choose a fresh path, or omit --audit-file for a unique default. The original contributor play_local.sh remains available.
+
+Team: Stanley Lur (leader), Jordain Ng; no team name. Module responsibilities are supplied by the team, not inferred from AI-generated code.

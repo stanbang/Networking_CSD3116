@@ -720,3 +720,96 @@ sudo apt update
 sudo apt install -y cmake
 ```
 This enables investigation; it is not a guarantee that dependency warnings disappear. P4 is INCOMPLETE. P5/P6, ten-minute soak, literal clean clone, two-machine play and human feel/packet checks remain pending. The local playable game, release/GUI/security/physics results and ASan/hardening passes are preserved separately from this failure. No entire-definition-of-done claim.
+
+
+## Fresh local main-integration verification
+
+See INTEGRATION.md for exact evidence paths. Independent builder release/unit/baseline/hardening returned0 (baseline warnings and initialclockskew disclosed). Initial independentP1 run1 failed (spoofclient admissiontimeout and server shutdownhang); retained. Run2 failedclosed because temporarycredential directory was absent; retained. PersistentLinuxhome fixture generated privately. Sequentialfallback unitregression passed existingfile/symlink preservation. Actualrun3 output below, observedexit0; this does not explain or clear the earlierhang or any P4 finding.
+
+```text
+COMMAND python3 -B tests/p1_network.py --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --output-dir build/evidence/integration-p1-run3
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/server --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --duration 180 --audit-file /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/evidence/integration-p1-run3/server-audit.log
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 1 --headless --bot circle --duration 120
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 2 --headless --bot circle --duration 120
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 3 --headless --bot circle --duration 120
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 4 --headless --bot circle --duration 120
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 5 --headless --bot circle --duration 120
+PASS concurrent joins: five distinct nonces and slots
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 6 --headless --bot circle --duration 3
+PASS sixth client rejected
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 6 --headless --bot circle --duration 120
+PASS explicit leave permits replacement
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 2 --headless --bot circle --duration 120
+PASS SIGKILL lease expiry permits rejoin
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 6 --headless --bot circle --duration 30 --fault spoof
+PASS SERVER_DROP identity=6 reason=spoof
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 6 --headless --bot circle --duration 30 --fault session
+PASS SERVER_DROP identity=6 reason=session
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 6 --headless --bot circle --duration 30 --fault id-zero
+PASS SERVER_DROP identity=6 reason=id-zero
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 6 --headless --bot circle --duration 30 --fault id-high
+PASS SERVER_DROP identity=6 reason=id-high
+COMMAND /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/build/release/client --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --identity 6 --headless --bot circle --duration 30 --fault replay
+PASS SERVER_DROP identity=6 reason=replay
+SERVER_SUMMARY joins=12 rejects=1 leaves=11 timeouts=1 invalid=4 stale=1 peak=5 inputs=316 rate_hits=0 auth_failures=0 middleware_events=21 moves=2454 shots=206 destroyed=52 splits=25 hits=0 respawns=0 gameovers=0 restarts=0 wraps=0 snapshots=185 points=3680 ticks=700
+PASS lifecycle audit records=36 root=f2875a5a707dde32868dbe318b15f0859f66a68f05f361bb4e6cb22a98a06dfa
+PASS P1 networking lifecycle and malformed-message counters
+OBSERVED_EXIT=0
+
+```
+
+
+## Current blocker: real secure GUI acceptance failed
+
+Actual `xvfb-run ... tests/p3_gui.py --security-dir <persistent Linux bundle> --output-dir build/evidence/integration-gui-run1` exited1. Both windows rendered, but the server summary had joins2, peak1, timeouts2, inputs5, moves0, shots0, snapshots40, ticks1500. The first lease expired before the second player joined. Both final PNGs show WAITING FOR GAME STATE rather than a current connected two-player world. Root inspected both actual images. This contradicts accepting the merged game as working locally on this host, regardless of contributor historical reports. It is not cleared by the headless run3 pass.
+
+Evidence: build/evidence/integration-gui-output.txt, integration-gui-exit.txt, integration-gui-run1/*.log and client1-10s.png/client2-10s.png. Cleanup completed; no successful manual GUI session is currently left open. Do not fabricate a manual-phase pass or open the game as if all own checks passed.
+
+The current bounded integration attempt cycle is stopped at the original maximum-three-attempt rule. The middle missing-/tmp-bundle prerequisite failure is disclosed, not silently erased to extend the limit. Request a human decision to authorize a new targeted GUI/network starvation/hang investigation cycle. No fourth network attempt or second GUI attempt has been run. A diagnosis is not established: do not label native dependency, GPU, clock, or the harness as the cause without stronger evidence.
+
+The merged implementation and all local work remain preserved. P1 integration acceptance is INCOMPLETE despite passing headless functionality. Native-security and P3 source exist; P2/P3 have not been newly accepted here. P4 OPEN HIGH TSan/Valgrind findings, full soak, external capture, two-machine verification, P5 measurements and P6 deliverables remain required by the original scope/PDF checklist.
+
+Actual GUI output (observedexit1):
+
+```text
+COMMAND xvfb-run -a -s -screen 0 1620x650x24 python3 -B tests/p3_gui.py --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --output-dir build/evidence/integration-gui-run1
+SCREENSHOT build/evidence/integration-gui-run1/client1-before.png
+SCREENSHOT build/evidence/integration-gui-run1/client2-before.png
+SCREENSHOT build/evidence/integration-gui-run1/client1-after-input.png
+SCREENSHOT build/evidence/integration-gui-run1/client2-after-input.png
+SCREENSHOT build/evidence/integration-gui-run1/client1-10s.png
+SCREENSHOT build/evidence/integration-gui-run1/client2-10s.png
+Traceback (most recent call last):
+  File "/mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/tests/p3_gui.py", line 124, in <module>
+    main()
+  File "/mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/tests/p3_gui.py", line 111, in main
+    exercise(out, server, log, clients, windows)
+  File "/mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/tests/p3_gui.py", line 71, in exercise
+    assert counts.get(key, -1) >= minimum, f"GUI did not exercise {key}: {counts}"
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: GUI did not exercise peak: {'joins': 2, 'rejects': 0, 'leaves': 0, 'timeouts': 2, 'invalid': 15, 'stale': 0, 'peak': 1, 'inputs': 5, 'rate_hits': 0, 'auth_failures': 0, 'middleware_events': 4, 'moves': 0, 'shots': 0, 'destroyed': 0, 'splits': 0, 'hits': 1, 'respawns': 1, 'gameovers': 0, 'restarts': 0, 'wraps': 0, 'snapshots': 40, 'points': 0, 'ticks': 1500}
+OBSERVED_EXIT=1
+
+```
+Actual managed-launcher check output (headless only):
+
+```text
+COMMAND bash tools/play.sh --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --headless --duration 600
+make: Nothing to be done for 'all'.
+Local session started. Logs: build/local-session.RWwE3GK5 server=429 client1=441 client2=553
+SECURE_SESSION_READY; confirm actual windows separately.
+OBSERVED_EXIT=0
+COMMAND bash tools/play.sh --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --headless --duration 600
+Secure session already running; use tools/stop.sh
+OBSERVED_EXIT=1
+COMMAND bash tools/stop.sh
+Stopped owned secure session.
+OBSERVED_EXIT=0
+Post-stop exact process query: no game process rows.
+
+```
+Fallback unit target returned0 and printed PASS audit exclusive creation and symlink target preservation; all existing protocol/sim fixtures passed. This establishes the audit fix, not resolution of runtime GUI stalls.
+
+
+## Paused teammate checkpoint
+User explicitly paused goal dueusage and authorized handover+commit/push. HANDOVER.md is current; selected actual nonsecret output copied under docs/evidence/2026-11-04-handover/ because build/ is ignored. Native ACK diagnostic measured requested1e9ns elapsed1000082330ns result-10; this is not a waitset overshoot. Latest active GUI has timeouts0/invalid0/freshconnected state, but overall network and GUI remain FAIL during ACK shutdown. No game tests/repairs ran afterpause, no private material included, no completion claim.

@@ -1,0 +1,6 @@
+DDS_SLOW_CALL op=acks elapsed_ns=1000082330 requested_ns=1000000000 returned=-10 before_dds_ns=1793790697062777559 after_dds_ns=1793790698062856168 before_rt_ns=1793790697062774957 after_rt_ns=1793790698062856041 delta_dds_ns=1000078609 delta_rt_ns=1000081084 clock_valid=1
+leave_ack: Timeout
+SERVER_LEAVE identity=6 id=3
+SERVER_LEAVE identity=6 id=1
+SERVER_SUMMARY joins=8 rejects=1 leaves=7 timeouts=1 invalid=1 stale=0 peak=5 inputs=319 rate_hits=0 auth_failures=0 middleware_events=13 moves=2126 shots=181 destroyed=25 splits=12 hits=0 respawns=0 gameovers=0 restarts=0 wraps=0 snapshots=196 points=1780 ticks=598
+AUDIT_ROOT hash=505bdfe211a6b618ade9015556ad86e39ffd0e95f23cedbdb7adf16c30414c67 records=22

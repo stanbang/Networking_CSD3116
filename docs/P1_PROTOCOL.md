@@ -1,3 +1,8 @@
+# Current merged-protocol note
+
+The merged implementation now enables native security by default and requires --security-dir with a valid private Linux bundle. Historical pre-security P1 text below describes development history, not permission for plaintext production use. Use current README/INTEGRATION.md for exact verification status; secure GUI acceptance currently fails on this host.
+
+---
 # P1 protocol and admission
 
 Purpose: explain the intermediate protocol and its limits. Author: <team>, with Codex assistance. Date: 2026-11-03.

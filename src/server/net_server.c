@@ -1,10 +1,14 @@
 /* Session-bound admission on native-secured identity channels. Author: <team>, Codex assistance. Date: 2026-11-03. */
 #include <stdio.h>
+#include <stdlib.h>
+#include "common/event_queue.h"
 #include <string.h>
 #include "server/server.h"
 #include "common/security.h"
 typedef struct {
-    dds_entity_t int_participant, int_waitset;
+    dds_entity_t int_participant;
+    EventQueue str_events;
+    EventReader arr_events[AST_EVENT_CHANNELS];
     dds_entity_t arr_join[AST_IDENTITIES], arr_input[AST_IDENTITIES], arr_leave[AST_IDENTITIES];
     dds_entity_t arr_response[AST_IDENTITIES];
     uint64_t int_response_seq;
@@ -190,6 +194,7 @@ static bool drain(Server *str_server, Network *str_net, unsigned int int_tag)
         else leave_message(str_server, int_channel + 1, arr_samples[int_i]);
     }
     if (int_count > 0 && !dds_ok(dds_return_loan(int_reader, arr_samples, int_count), "return_loan")) b_ok = false;
+    if (b_ok && int_count == AST_BATCH) b_ok = event_queue_mark(&str_net->str_events, int_tag);
     return b_ok;
 }
 
@@ -198,8 +203,6 @@ static bool network_init(Server *str_server, Network *str_net)
 {
     str_net->int_participant = secure_participant(&str_server->str_options, true);
     if (!dds_ok(str_net->int_participant, "create_participant")) return false;
-    str_net->int_waitset = dds_create_waitset(str_net->int_participant);
-    if (!dds_ok(str_net->int_waitset, "create_waitset")) return false;
     str_net->int_snapshot = endpoint(str_net->int_participant, &Ast_Snapshot_desc, "Snapshot", 0, true, false);
     if (str_net->int_snapshot < 0) return false;
     for (unsigned int int_i = 0; int_i < AST_IDENTITIES; ++int_i) {
@@ -209,10 +212,13 @@ static bool network_init(Server *str_server, Network *str_net)
         str_net->arr_response[int_i] = endpoint(str_net->int_participant, &Ast_Response_desc, "Response", int_i + 1, true, true);
         if (str_net->arr_join[int_i] < 0 || str_net->arr_input[int_i] < 0 || str_net->arr_leave[int_i] < 0 ||
             str_net->arr_response[int_i] < 0) return false;
-        if (!attach_reader(str_net->int_participant, str_net->int_waitset, str_net->arr_join[int_i], int_i * 3) ||
-            !attach_reader(str_net->int_participant, str_net->int_waitset, str_net->arr_input[int_i], int_i * 3 + 1) ||
-            !attach_reader(str_net->int_participant, str_net->int_waitset, str_net->arr_leave[int_i], int_i * 3 + 2)) return false;
+        if (!event_reader_attach(&str_net->arr_events[int_i * 3], str_net->arr_join[int_i]) ||
+            !event_reader_attach(&str_net->arr_events[int_i * 3 + 1], str_net->arr_input[int_i]) ||
+            !event_reader_attach(&str_net->arr_events[int_i * 3 + 2], str_net->arr_leave[int_i])) return false;
     }
+    /* One seed covers samples received before the listeners were installed. */
+    for (unsigned int int_i = 0; int_i < AST_EVENT_CHANNELS; ++int_i)
+        if (!event_queue_mark(&str_net->str_events, int_i)) return false;
     return true;
 }
 
@@ -236,24 +242,33 @@ static bool publish_snapshot(Server *str_server, Network *str_net)
     return dds_ok(dds_write(str_net->int_snapshot, &str_snapshot), "snapshot_write");
 }
 
-/* Sole DDS owner. Waitsets replace baseline busy polling, with bounded shutdown wait. */
+/* Sole DDS I/O owner. Listener bits and monotonic condition wait avoid polling. */
 void *server_worker(void *ptr_server)
 {
     Server *str_server = ptr_server;
     Network str_net = {0};
-    bool b_ok = network_init(str_server, &str_net);
+    bool b_ok = event_queue_init(&str_net.str_events);
+    for (unsigned int int_i = 0; b_ok && int_i < AST_EVENT_CHANNELS; ++int_i)
+        b_ok = event_reader_init(&str_net.arr_events[int_i], &str_net.str_events, int_i);
+    if (b_ok) b_ok = network_init(str_server, &str_net);
     if (b_ok) { puts("SERVER_READY security=NATIVE_DDS domain=42"); atomic_store(&str_server->b_ready, true); }
     while (b_ok && !atomic_load(&str_server->b_stop)) {
-        dds_attach_t arr_tags[AST_IDENTITIES * 3] = {0};
-        dds_return_t int_count = dds_waitset_wait(str_net.int_waitset, arr_tags, AST_IDENTITIES * 3, DDS_MSECS(50));
-        if (!dds_ok(int_count, "waitset_wait")) { b_ok = false; break; }
-        for (dds_return_t int_i = 0; int_i < int_count && b_ok; ++int_i) {
-            if (arr_tags[int_i] < 0 || arr_tags[int_i] >= AST_IDENTITIES * 3) { b_ok = false; break; }
-            b_ok = drain(str_server, &str_net, (unsigned int)arr_tags[int_i]);
-        }
+        uint32_t int_ready = 0;
+        if (!event_queue_wait(&str_net.str_events, &int_ready)) { b_ok = false; break; }
+        /* Queue lock is released before DDS loans, crypto, audit or game locks. */
+        for (unsigned int int_i = 0; int_i < AST_EVENT_CHANNELS && b_ok; ++int_i)
+            if (int_ready & (UINT32_C(1) << int_i)) b_ok = drain(str_server, &str_net, int_i);
         if (b_ok) b_ok = publish_snapshot(str_server, &str_net);
     }
-    if (str_net.int_participant > 0 && !dds_ok(dds_delete(str_net.int_participant), "delete_participant")) b_ok = false;
+    /* Native listener removal waits active callbacks; never hold the queue lock here. */
+    for (unsigned int int_i = 0; int_i < AST_EVENT_CHANNELS; ++int_i)
+        if (!event_reader_detach(&str_net.arr_events[int_i])) b_ok = false;
+    if (str_net.int_participant > 0 && !dds_ok(dds_delete(str_net.int_participant), "delete_participant")) {
+        fputs("DDS deletion failed; cannot release callback context safely\n", stderr); _Exit(EXIT_FAILURE);
+    }
+    if (str_net.str_events.b_initialized && !event_queue_fini(&str_net.str_events)) {
+        fputs("Event queue teardown failed\n", stderr); _Exit(EXIT_FAILURE);
+    }
     atomic_store(&str_server->b_failed, !b_ok);
     atomic_store(&str_server->b_stop, true);
     return NULL;

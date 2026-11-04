@@ -35,6 +35,11 @@ def stop(process, sig=signal.SIGTERM):
     try:
         return process.wait(timeout=5)
     except subprocess.TimeoutExpired:
+        for task in sorted(Path(f"/proc/{process.pid}/task").glob("*")):
+            try:
+                print("HUNG_THREAD", task.name, (task / "wchan").read_text().strip(), flush=True)
+            except OSError:
+                pass
         process.kill()
         process.wait(timeout=3)
         raise AssertionError("Child did not stop within five seconds")
@@ -44,25 +49,27 @@ def main():
     """Exercise concurrent admission, capacity, leave, lease and bad messages."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bin-dir", default="build/release")
+    parser.add_argument("--output-dir", type=Path, default=Path("build/p1-test"),
+                        help="New evidence directory; existing output is never overwritten")
     parser.add_argument("--security-dir", help="Use native DDS security when configured by P2")
     args = parser.parse_args()
     security = ["--security-dir", args.security_dir] if args.security_dir else []
     binaries = Path(args.bin_dir).resolve()
-    out = Path("build/p1-test")
-    out.mkdir(parents=True, exist_ok=True)
+    out = args.output_dir
+    out.mkdir(parents=True, exist_ok=False)
     audit = (out / "server-audit.log").resolve()
     children, handles = [], []
 
     def start(name, command):
         path = out / f"{name}.log"
-        stream = path.open("w")
+        stream = path.open("x")
         handles.append(stream)
         print("COMMAND", " ".join(map(str, command)), flush=True)
         proc = subprocess.Popen(list(map(str, command)), stdout=stream, stderr=subprocess.STDOUT)
         children.append(proc)
         return proc, path
 
-    def client(name, identity, duration=45, fault=None):
+    def client(name, identity, duration=120, fault=None):
         command = [binaries / "client", *security, "--identity", identity, "--headless",
                    "--bot", "circle", "--duration", duration]
         if fault:
@@ -71,7 +78,7 @@ def main():
 
     accepted = r"CLIENT_JOIN nonce=([0-9a-fA-F]{32}) id=([1-5]) status=accepted"
     try:
-        server, server_log = start("server", [binaries / "server", *security, "--duration", 60,
+        server, server_log = start("server", [binaries / "server", *security, "--duration", 180,
                                                "--audit-file", audit])
         time.sleep(0.5)
         initial = [client(f"initial-{i}", i) for i in range(1, 6)]
@@ -100,12 +107,12 @@ def main():
         print("PASS SIGKILL lease expiry permits rejoin", flush=True)
 
         for fault in ("spoof", "session", "id-zero", "id-high", "replay"):
-            proc, path = client(f"fault-{fault}", 6, 2, fault)
+            proc, path = client(f"fault-{fault}", 6, 30, fault)
             wait_line(path, accepted, proc)
-            assert proc.wait(timeout=8) == 0, f"Fault client {fault} failed"
             event = wait_line(server_log, rf"SERVER_DROP identity=6 reason={fault}\b", server)
             if security:
                 wait_line(audit, rf"identity=6 event=DROP reason={fault}\b", server)
+            assert stop(proc) == 0, f"Fault client {fault} shutdown failed"
             print(f"PASS {event.group(0)}", flush=True)
         for proc, _ in initial[2:]:
             assert proc.poll() is None, "Legitimate client died during faults"
@@ -117,6 +124,7 @@ def main():
         for key, minimum in (("joins", 12), ("rejects", 1), ("leaves", 10),
                              ("timeouts", 1), ("invalid", 4), ("stale", 1), ("inputs", 1)):
             assert counts.get(key, -1) >= minimum, f"{key}: expected >= {minimum}, got {counts}"
+        assert counts.get("timeouts") == 1, f"Unexpected legitimate-session lease loss: {counts}"
         assert counts.get("peak") == 5, f"Five-player peak/cap missing: {counts}"
         print("SERVER_SUMMARY", summary.group(1), flush=True)
         if security:

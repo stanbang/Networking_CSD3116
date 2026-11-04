@@ -1,3 +1,25 @@
+# Paused checkpoint - latest authoritative status
+
+Stanley explicitly paused the goal on4November2026 and requested a teammate handover plus publication. Read HANDOVER.md first. The listener repair preserves active two-client GUI state in the latest targeted run, but overall GUI/network checks still FAIL native one-second Leave ACK timeout. No further game tests/repairs after pause. Selected portable raw evidence is in docs/evidence/2026-11-04-handover/. Earlier status text below is historical. No goal-complete or submission-ready claim.
+
+---
+# Latest integration status: GUI verification blocked
+
+See the current blocker section below. Existing build/unit/headless passes are narrower than full graphical multiplayer acceptance.
+
+# Current integration priorities
+
+See INTEGRATION.md for the reconciliation with our PDF checklist and local approval gates.
+
+- [ ] Investigate the fresh P1 run1 server/network shutdown hang; run3 passed but root cause remains unproven.
+- [ ] Finish current secure launcher/manual P1 acceptance; preserve --baseline mode and all prior evidence.
+- [ ] Continue the original P2-P6 verification/materials below after the relevant approvals. Existing implementation is reused, not rebuilt.
+- [x] Record actual team roster: Stanley Lur (leader), Jordain Ng; no team name. Responsibilities still supplied by the team.
+- [x] Confirm supplied Team Lab PDF deadline: Friday6November2026. Moodle submission itself remains human/unverified.
+
+The following contributor checklist is retained, including historical claims. Its two-computer pause note is context from that contribution, not a new instruction in this chat.
+
+---
 # Remaining work — DDS Asteroids
 
 Checkpoint: 2026-11-04. Two-computer setup is paused at the user's request. Gameplay and local networking are implemented; full assignment verification is incomplete.
@@ -59,3 +81,14 @@ The second PC reportedly has Windows/Ubuntu/WSL and the project. Shared-network 
 - [x] Local two-window launcher and current README/test/review/AI documentation.
 
 Start with item 1 when verification resumes; two-computer work remains paused unless the user resumes it. No new tests or implementation were implied merely by this checklist.
+
+
+## Current blocker: real secure GUI acceptance failed
+
+Actual `xvfb-run ... tests/p3_gui.py --security-dir <persistent Linux bundle> --output-dir build/evidence/integration-gui-run1` exited1. Both windows rendered, but the server summary had joins2, peak1, timeouts2, inputs5, moves0, shots0, snapshots40, ticks1500. The first lease expired before the second player joined. Both final PNGs show WAITING FOR GAME STATE rather than a current connected two-player world. Root inspected both actual images. This contradicts accepting the merged game as working locally on this host, regardless of contributor historical reports. It is not cleared by the headless run3 pass.
+
+Evidence: build/evidence/integration-gui-output.txt, integration-gui-exit.txt, integration-gui-run1/*.log and client1-10s.png/client2-10s.png. Cleanup completed; no successful manual GUI session is currently left open. Do not fabricate a manual-phase pass or open the game as if all own checks passed.
+
+The current bounded integration attempt cycle is stopped at the original maximum-three-attempt rule. The middle missing-/tmp-bundle prerequisite failure is disclosed, not silently erased to extend the limit. Request a human decision to authorize a new targeted GUI/network starvation/hang investigation cycle. No fourth network attempt or second GUI attempt has been run. A diagnosis is not established: do not label native dependency, GPU, clock, or the harness as the cause without stronger evidence.
+
+The merged implementation and all local work remain preserved. P1 integration acceptance is INCOMPLETE despite passing headless functionality. Native-security and P3 source exist; P2/P3 have not been newly accepted here. P4 OPEN HIGH TSan/Valgrind findings, full soak, external capture, two-machine verification, P5 measurements and P6 deliverables remain required by the original scope/PDF checklist.

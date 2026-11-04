@@ -28,8 +28,6 @@ void sleep_ns(uint64_t int_ns);
 bool random_bytes(void *ptr_data, size_t int_size);
 dds_entity_t endpoint(dds_entity_t int_participant, const dds_topic_descriptor_t *str_desc,
                       const char *str_kind, unsigned int int_identity, bool b_writer, bool b_reliable);
-bool attach_reader(dds_entity_t int_participant, dds_entity_t int_waitset,
-                   dds_entity_t int_reader, dds_attach_t int_tag);
 bool dds_ok(dds_return_t int_result, const char *str_operation);
 void mutex_lock(pthread_mutex_t *str_mutex);
 void mutex_unlock(pthread_mutex_t *str_mutex);

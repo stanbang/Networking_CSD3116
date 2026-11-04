@@ -1,0 +1,19 @@
+$ make check-hardening
+make: Warning: File 'build/release/server' has modification time 1.4 s in the future
+bash tools/check_hardening.sh build/release/server build/release/client
+== build/release/server
+  Type:                              DYN (Position-Independent Executable file)
+  GNU_STACK      0x000000 0x0000000000000000 0x0000000000000000 0x000000 0x000000 RW  0x10
+  GNU_RELRO      0x00a850 0x000000000000a850 0x000000000000a850 0x0007b0 0x0007b0 R   0x1
+ 0x000000000000001e (FLAGS)              BIND_NOW
+ 0x000000006ffffffb (FLAGS_1)            Flags: NOW PIE
+PASS PIE NX RELRO BIND_NOW CANARY references=2
+== build/release/client
+  Type:                              DYN (Position-Independent Executable file)
+  GNU_STACK      0x000000 0x0000000000000000 0x0000000000000000 0x000000 0x000000 RW  0x10
+  GNU_RELRO      0x00d710 0x000000000000d710 0x000000000000d710 0x0008f0 0x0008f0 R   0x1
+ 0x000000000000001e (FLAGS)              BIND_NOW
+ 0x000000006ffffffb (FLAGS_1)            Flags: NOW PIE
+PASS PIE NX RELRO BIND_NOW CANARY references=2
+make: warning:  Clock skew detected.  Your build may be incomplete.
+COMMAND_EXIT=0

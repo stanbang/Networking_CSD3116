@@ -82,9 +82,13 @@ $(OUT)/test-protocol: tests/test_protocol.c $(COMMON_SRC) $(GEN)/messages.c $(GE
 $(OUT)/test-sim: tests/test_sim.c src/common/sim.c src/common/sim.h src/common/config.h Makefile
 > mkdir -p $(OUT)
 > $(CC) $(CFLAGS) tests/test_sim.c src/common/sim.c -o $@ $(LDFLAGS) -lm
-test: $(OUT)/test-protocol $(OUT)/test-sim
+$(OUT)/test-event-queue: tests/test_event_queue.c $(COMMON_SRC) $(GEN)/messages.c $(GEN)/messages.h $(HEADERS) Makefile
+> mkdir -p $(OUT)
+> $(CC) $(CFLAGS) $(DDS_CF) $(SSL_CF) $(filter %.c,$^) -o $@ $(LDFLAGS) $(DDS_LD) $(SSL_LD) -pthread -lm
+test: $(OUT)/test-protocol $(OUT)/test-sim $(OUT)/test-event-queue
 > ./$(OUT)/test-protocol
 > ./$(OUT)/test-sim
+> ./$(OUT)/test-event-queue
 
 # Verify PIE / NX / RELRO / stack canary are really present in the binaries
 check-hardening: all

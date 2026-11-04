@@ -45,3 +45,8 @@ tsan.*
 *.swp
 .DS_Store
 Thumbs.db
+
+# Local packet evidence and Python caches.
+*.pcap
+__pycache__/
+*.py[cod]

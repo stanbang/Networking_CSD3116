@@ -7,9 +7,11 @@ cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 int_duration=3600
 b_headless=false
 b_fresh=false
+str_security_arg=
 while (( $# )); do
   case "$1" in
     --headless) b_headless=true; shift ;;
+    --security-dir) [[ $# -ge 2 ]] || exit 2; str_security_arg=$2; shift 2 ;;
     --fresh-certs) b_fresh=true; shift ;;
     --duration)
       [[ $# -ge 2 && $2 =~ ^[0-9]{1,5}$ ]] || { echo 'Expected duration 1..86400' >&2; exit 2; }
@@ -40,9 +42,12 @@ usable_bundle() {
 }
 
 make -j2
-str_security=''
-if [[ $b_fresh == false && -f build/local-security-dir ]]; then
+str_security=$str_security_arg
+if [[ -z $str_security_arg && $b_fresh == false && -f build/local-security-dir ]]; then
   IFS= read -r str_security < build/local-security-dir || true
+fi
+if [[ -n $str_security_arg ]] && ! usable_bundle "$str_security"; then
+  echo "Explicit security bundle failed checks" >&2; exit 1
 fi
 if ! usable_bundle "$str_security"; then
   str_result=$(bash tools/gen_certs.sh)
@@ -52,6 +57,7 @@ if ! usable_bundle "$str_security"; then
   printf '%s\n' "$str_security" > build/local-security-dir
 fi
 
+str_run=$(mktemp -d build/local-session.XXXXXXXX)
 # Only this shell's active jobs are signalled; cleanup remains bounded on DDS faults.
 cleanup() {
   local -a arr_live=()
@@ -68,23 +74,35 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 ./build/release/server --security-dir "$str_security" --duration "$int_duration" \
-  --audit-file build/local-audit.log >build/local-server.log 2>&1 &
+  --audit-file "$str_run/audit.log" >"$str_run/server.log" 2>&1 &
 int_server=$!
 for ((int_attempt=0; int_attempt<200; ++int_attempt)); do
-  if grep -q '^SERVER_READY ' build/local-server.log; then break; fi
-  kill -0 "$int_server" 2>/dev/null || { cat build/local-server.log >&2; exit 1; }
+  if grep -q '^SERVER_READY ' "$str_run/server.log" 2>/dev/null; then break; fi
+  kill -0 "$int_server" 2>/dev/null || { cat "$str_run/server.log" >&2; exit 1; }
   sleep .1
 done
-grep -q '^SERVER_READY ' build/local-server.log || { echo 'Server startup timed out; see build/local-server.log' >&2; exit 1; }
+grep -q '^SERVER_READY ' "$str_run/server.log" 2>/dev/null || { echo 'Server startup timed out; see "$str_run/server.log"' >&2; exit 1; }
 arr_flags=()
 if [[ $b_headless == true ]]; then arr_flags=(--headless --bot circle); fi
 ./build/release/client --security-dir "$str_security" --identity 1 --duration "$int_duration" \
-  "${arr_flags[@]}" >build/local-client1.log 2>&1 &
+  "${arr_flags[@]}" >"$str_run/client1.log" 2>&1 &
 int_client1=$!
+for ((int_attempt=0; int_attempt<200; ++int_attempt)); do
+  grep -q 'CLIENT_JOIN .*status=accepted' "$str_run/client1.log" 2>/dev/null && break
+  kill -0 "$int_client1" 2>/dev/null || exit 1
+  sleep .1
+done
+grep -q 'CLIENT_JOIN .*status=accepted' "$str_run/client1.log" 2>/dev/null || exit 1
 ./build/release/client --security-dir "$str_security" --identity 2 --duration "$int_duration" \
-  "${arr_flags[@]}" >build/local-client2.log 2>&1 &
+  "${arr_flags[@]}" >"$str_run/client2.log" 2>&1 &
 int_client2=$!
-printf 'Local session started. Closing either window ends the session. Logs: build/local-*.log\n'
+for ((int_attempt=0; int_attempt<200; ++int_attempt)); do
+  grep -q 'CLIENT_JOIN .*status=accepted' "$str_run/client2.log" 2>/dev/null && break
+  kill -0 "$int_client2" 2>/dev/null || exit 1
+  sleep .1
+done
+grep -q 'CLIENT_JOIN .*status=accepted' "$str_run/client2.log" 2>/dev/null || exit 1
+printf 'Local session started. Logs: %s server=%s client1=%s client2=%s\n' "$str_run" "$int_server" "$int_client1" "$int_client2"
 int_status=0
 wait -n "$int_server" "$int_client1" "$int_client2" || int_status=$?
 if (( int_status )); then echo 'A game process failed; inspect build/local-*.log' >&2; fi

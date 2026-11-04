@@ -20,7 +20,7 @@ static bool number(const char *str_text, unsigned int *int_out, unsigned int int
 bool options_parse(int int_argc, char **arr_argv, Options *str_options, bool b_server)
 {
     *str_options = (Options){.int_identity = 1, .dbl_duration = 60.0,
-                            .str_bot = "idle", .str_fault = "none", .str_audit_file = "build/server-audit.log"};
+                            .str_bot = "idle", .str_fault = "none", .str_audit_file = NULL};
     for (int int_i = 1; int_i < int_argc; ++int_i) {
         const char *str_arg = arr_argv[int_i];
         if (!b_server && strcmp(str_arg, "--headless") == 0) { str_options->b_headless = true; continue; }

@@ -1,3 +1,17 @@
+# Paused checkpoint - latest authoritative status
+
+Stanley explicitly paused the goal on4November2026 and requested a teammate handover plus publication. Read HANDOVER.md first. The listener repair preserves active two-client GUI state in the latest targeted run, but overall GUI/network checks still FAIL native one-second Leave ACK timeout. No further game tests/repairs after pause. Selected portable raw evidence is in docs/evidence/2026-11-04-handover/. Earlier status text below is historical. No goal-complete or submission-ready claim.
+
+---
+# Latest integration status: GUI verification blocked
+
+See the current blocker section below. Existing build/unit/headless passes are narrower than full graphical multiplayer acceptance.
+
+# Current integration status - 4 November 2026
+
+User requested integrating the contributor merge and approved proceeding with P1/v2. Main2cad2e1 is now integrated with local work preserved. NativeA and P0 are approved. Existing P1-P3 code is present; do not treat it as a starter anymore. Fresh builds/unit/hardening pass; P1 run3 passed after evidence/harness fixes, while the first runtime hang remains unresolved. P4 has known OPEN HIGH findings; P5/P6 materials remain missing. See INTEGRATION.md for current evidence, schema differences, remaining requirements and phase gates. Everything below is preserved contributor history, not automatic fresh acceptance on this machine.
+
+---
 # Progress — DDS Asteroids
 
 ## P0: BLOCKED (2026-11-03)
@@ -137,3 +151,22 @@ Defence notes: fixed-tick authoritative physics prevents input-rate speedups; bo
 User asked to leave two-computer testing for now, commit current work and list remaining tasks. This explicitly authorizes the local git commit for this checkpoint despite the default AGENTS.md human-commit restriction; no push or git-config change is authorized. LAN investigation applied no host/firewall/WSL changes and produced no claim of a completed cross-machine test. Current DDS configuration remains loopback-only.
 
 Prioritised remaining work is docs/TODO.md: unresolved TSan/Valgrind dependency findings/CMake prerequisite; deferred reachable-network/WSL/cert setup and actual two-PC test; full10-minute soak, clean-clone/extracted-build, external packet/human checks; measured optimisation; slides/video/peer/AI/package. Gameplay/local tests and known verification limits are preserved. Source/documentation only will be staged after secret/artifact checks; build outputs/private credentials remain excluded. Commit result will be reported to the user after success.
+
+
+## Current blocker: real secure GUI acceptance failed
+
+Actual `xvfb-run ... tests/p3_gui.py --security-dir <persistent Linux bundle> --output-dir build/evidence/integration-gui-run1` exited1. Both windows rendered, but the server summary had joins2, peak1, timeouts2, inputs5, moves0, shots0, snapshots40, ticks1500. The first lease expired before the second player joined. Both final PNGs show WAITING FOR GAME STATE rather than a current connected two-player world. Root inspected both actual images. This contradicts accepting the merged game as working locally on this host, regardless of contributor historical reports. It is not cleared by the headless run3 pass.
+
+Evidence: build/evidence/integration-gui-output.txt, integration-gui-exit.txt, integration-gui-run1/*.log and client1-10s.png/client2-10s.png. Cleanup completed; no successful manual GUI session is currently left open. Do not fabricate a manual-phase pass or open the game as if all own checks passed.
+
+The current bounded integration attempt cycle is stopped at the original maximum-three-attempt rule. The middle missing-/tmp-bundle prerequisite failure is disclosed, not silently erased to extend the limit. Request a human decision to authorize a new targeted GUI/network starvation/hang investigation cycle. No fourth network attempt or second GUI attempt has been run. A diagnosis is not established: do not label native dependency, GPU, clock, or the harness as the cause without stronger evidence.
+
+The merged implementation and all local work remain preserved. P1 integration acceptance is INCOMPLETE despite passing headless functionality. Native-security and P3 source exist; P2/P3 have not been newly accepted here. P4 OPEN HIGH TSan/Valgrind findings, full soak, external capture, two-machine verification, P5 measurements and P6 deliverables remain required by the original scope/PDF checklist.
+
+## Authorized GUI repair cycle - current
+User explicitly replied FIX: continue GUI investigation. New maximum-three-loop cycle authorized. Plan: reproduce current software-GL failure with per-process CPU/thread/RSS and wait-state samples; distinguish rendering resource contention from application/DDS blocking before edits. Compare one controlled rendering change only when installed support is verified. Keep native security enabled, three-second leases, two actual clients, unchanged movement/fire/state assertions, retained failed outputs. Fresh independent builder/reviewer/tester roles requested; report availability honestly. Acceptance remains two concurrent connected windows >=10seconds, real input movement/fire, zero unintended lease expiry, correct cleanup, and inspected screenshots. Then open WSLg session, print manual checklist and STOP until APPROVED P1 or FIX. No blanket P4/sanitizer/security completion claim.
+
+### GUI cycle diagnosis and approved repair design
+Fresh default software-GL reproduction failed; reducing LP_NUM_THREADS to2 lowered each client from74 to14threads but still caused2lease expiries. The old GUI harness printed PASS despite timeouts; current stricter checks reject that false positive and require distinct IDs, sustained own-state receipt, final fresh progress, zero timeouts/invalid sessions and two normal leaves. Diagnostic-only wrappers preserve arguments/results/errno and report real dds_waitset_wait requests50,000,000ns taking~4.47-4.78seconds. Read-only observer samples continued at~0.5s, lowCPU and amplememory; CPU starvation and clock jumps are not established. Native emptyguard probe12pairs and extended60pairs returned normally at~50ms with realtime/monotonic/DDS clocks aligned. Exact0.10.4 source shows mutex acquisition/reacquisition outside the APIcondition deadline; underlying internal cause is not yet proven.
+
+Reviewer approved event-driven dataavailable listeners plus fixed ready-bitmask and CLOCK_MONOTONIC condition as the bounded application fix. No native positive timedwait/polling-sleep workaround; no new threads, IDL, QoS, crypto or lease changes. Callbacks only signal the queue, all DDS work is outside its lock, full batches requeue, startup contexts are stable, synchronous listener detach precedes cleanup. Builder implementing; tester will run fresh native headless lifecycle and strict original-default GUI tests without LPcap/preload. Known P4/native timer and lease-recovery limitations remain explicit; this is not a sanitizer or full-security pass.

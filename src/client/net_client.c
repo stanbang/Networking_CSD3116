@@ -1,11 +1,15 @@
-/* Nonce-addressed finite headless networking. P1 is insecure. Author: <team>, Codex assistance. Date: 2026-11-03. */
+/* Nonce-addressed finite networking on native-secured identity channels. Author: <team>, Codex assistance. Date: 2026-11-03. */
 #include <inttypes.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include "common/event_queue.h"
 #include <string.h>
 #include "client/client.h"
 #include "common/security.h"
 typedef struct {
-    dds_entity_t int_participant, int_waitset, int_join, int_response, int_input, int_leave;
+    dds_entity_t int_participant, int_join, int_response, int_input, int_leave;
+    EventQueue str_events;
+    EventReader arr_events[2];
     dds_entity_t int_snapshot;
     uint8_t arr_nonce[16];
     uint64_t int_seq, int_session, int_last_send, int_response_seq;
@@ -89,7 +93,9 @@ static bool drain(Client *str_client, Network *str_net, bool b_snapshot)
         if (b_snapshot) receive_snapshot(str_client,str_net,arr_samples[int_i]);
         else response(str_client, str_net, arr_samples[int_i]);
     }
-    return int_count == 0 || dds_ok(dds_return_loan(int_reader, arr_samples, int_count), "response_return_loan");
+    bool b_ok = int_count == 0 || dds_ok(dds_return_loan(int_reader, arr_samples, int_count), "response_return_loan");
+    if (b_ok && int_count == AST_BATCH) b_ok = event_queue_mark(&str_net->str_events, b_snapshot ? 1 : 0);
+    return b_ok;
 }
 
 /* Test-only mutations preserve the real session locally so graceful leave still works. */
@@ -171,10 +177,9 @@ static bool network_init(Client *str_client, Network *str_net)
     str_net->int_response = endpoint(str_net->int_participant, &Ast_Response_desc, "Response", int_id, false, true);
     str_net->int_snapshot = endpoint(str_net->int_participant, &Ast_Snapshot_desc, "Snapshot", 0, false, false);
     if (str_net->int_join < 0 || str_net->int_input < 0 || str_net->int_leave < 0 || str_net->int_response < 0 || str_net->int_snapshot < 0) return false;
-    str_net->int_waitset = dds_create_waitset(str_net->int_participant);
-    return dds_ok(str_net->int_waitset, "create_waitset") &&
-        attach_reader(str_net->int_participant, str_net->int_waitset, str_net->int_response, 0) &&
-        attach_reader(str_net->int_participant, str_net->int_waitset, str_net->int_snapshot, 1);
+    return event_reader_attach(&str_net->arr_events[0], str_net->int_response) &&
+        event_reader_attach(&str_net->arr_events[1], str_net->int_snapshot) &&
+        event_queue_mark(&str_net->str_events, 0) && event_queue_mark(&str_net->str_events, 1);
 }
 
 /* Reliable leave is acknowledged before participant teardown, outside all locks. */
@@ -187,26 +192,35 @@ static bool send_leave(Network *str_net)
         dds_ok(dds_wait_for_acks(str_net->int_leave, DDS_SECS(1)), "leave_ack");
 }
 
-/* Sole DDS owner: bounded 50ms wait avoids polling and permits prompt main shutdown. */
+/* Sole DDS I/O owner: bounded monotonic condition wait, notified by native listeners. */
 void *client_worker(void *ptr_client)
 {
     Client *str_client = ptr_client;
     Network str_net = {0};
     client_trace_sink(true);
-    bool b_ok = network_init(str_client, &str_net);
+    bool b_ok = event_queue_init(&str_net.str_events);
+    for (unsigned int int_i = 0; b_ok && int_i < 2; ++int_i)
+        b_ok = event_reader_init(&str_net.arr_events[int_i], &str_net.str_events, int_i);
+    if (b_ok) b_ok = network_init(str_client, &str_net);
     atomic_store(&str_client->b_ready, b_ok);
     while (b_ok && !atomic_load(&str_client->b_stop)) {
-        dds_attach_t arr_tags[2] = {0};
-        dds_return_t int_count = dds_waitset_wait(str_net.int_waitset, arr_tags, 2, DDS_MSECS(50));
-        b_ok = dds_ok(int_count, "waitset_wait");
-        for (dds_return_t int_i = 0; b_ok && int_i < int_count; ++int_i) {
-            if (arr_tags[int_i] == 0 && strcmp(str_client->str_options.str_fault, "slow-reader") == 0) sleep_ns(AST_HEARTBEAT_NS);
-            else b_ok = drain(str_client, &str_net, arr_tags[int_i] == 1);
+        uint32_t int_ready = 0;
+        b_ok = event_queue_wait(&str_net.str_events, &int_ready);
+        for (unsigned int int_i = 0; b_ok && int_i < 2; ++int_i) if (int_ready & (UINT32_C(1) << int_i)) {
+            if (int_i == 0 && strcmp(str_client->str_options.str_fault, "slow-reader") == 0) sleep_ns(AST_HEARTBEAT_NS);
+            else b_ok = drain(str_client, &str_net, int_i == 1);
         }
         if (b_ok && !atomic_load(&str_client->b_stop)) b_ok = send_message(str_client, &str_net, monotonic_ns());
     }
     if (b_ok) b_ok = send_leave(&str_net);
-    if (str_net.int_participant > 0 && !dds_ok(dds_delete(str_net.int_participant), "delete_participant")) b_ok = false;
+    for (unsigned int int_i = 0; int_i < 2; ++int_i)
+        if (!event_reader_detach(&str_net.arr_events[int_i])) b_ok = false;
+    if (str_net.int_participant > 0 && !dds_ok(dds_delete(str_net.int_participant), "delete_participant")) {
+        fputs("DDS deletion failed; cannot release callback context safely\n", stderr); _Exit(EXIT_FAILURE);
+    }
+    if (str_net.str_events.b_initialized && !event_queue_fini(&str_net.str_events)) {
+        fputs("Event queue teardown failed\n", stderr); _Exit(EXIT_FAILURE);
+    }
     client_trace_sink(false);
     atomic_store(&str_client->b_failed, !b_ok);
     atomic_store(&str_client->b_stop, true);

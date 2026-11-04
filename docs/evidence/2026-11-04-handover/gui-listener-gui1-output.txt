@@ -1,0 +1,25 @@
+LP_NUM_THREADS=unset
+LD_PRELOAD=unset
+COMMAND xvfb-run -a -s -screen 0 1620x650x24 python3 -B tests/gui_runtime_diagnostics.py --diagnostics build/evidence/gui-listener-gui1-diagnostics.jsonl --security-dir /home/stanley/.local/state/dds-asteroids/credentials-integration-20261104-01 --output-dir build/evidence/gui-listener-gui1
+SCREENSHOT build/evidence/gui-listener-gui1/client1-before.png
+SCREENSHOT build/evidence/gui-listener-gui1/client2-before.png
+SCREENSHOT build/evidence/gui-listener-gui1/client1-after-input.png
+SCREENSHOT build/evidence/gui-listener-gui1/client2-after-input.png
+SCREENSHOT build/evidence/gui-listener-gui1/client1-10s.png
+SCREENSHOT build/evidence/gui-listener-gui1/client2-10s.png
+FRESH_STATE client=1 observed_age_seconds=1.515
+FRESH_STATE client=2 observed_age_seconds=0.850
+LIVE_STATE client=1 id=1 samples=12 first_tick=67 last_tick=735
+LIVE_STATE client=2 id=2 samples=11 first_tick=103 last_tick=711
+Traceback (most recent call last):
+  File "/mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/tests/gui_runtime_diagnostics.py", line 138, in <module>
+    main()
+  File "/mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/tests/gui_runtime_diagnostics.py", line 124, in main
+    p3_gui.main()
+  File "/mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/tests/p3_gui.py", line 174, in main
+    exercise(out, server, log, clients, windows)
+  File "/mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116/tests/p3_gui.py", line 122, in exercise
+    assert stop(process) == 0, "GUI client shutdown failed"
+           ^^^^^^^^^^^^^^^^^^
+AssertionError: GUI client shutdown failed
+OBSERVED_EXIT=1

@@ -36,13 +36,3 @@ dds_entity_t endpoint(dds_entity_t int_participant, const dds_topic_descriptor_t
     dds_ok(int_endpoint, "create_endpoint");
     return int_endpoint;
 }
-
-/* Participant deletion owns condition cleanup. */
-bool attach_reader(dds_entity_t int_participant, dds_entity_t int_waitset,
-                   dds_entity_t int_reader, dds_attach_t int_tag)
-{
-    (void)int_participant;
-    dds_entity_t int_condition = dds_create_readcondition(int_reader, DDS_ANY_STATE);
-    return dds_ok(int_condition, "create_readcondition") &&
-        dds_ok(dds_waitset_attach(int_waitset, int_condition, int_tag), "waitset_attach");
-}

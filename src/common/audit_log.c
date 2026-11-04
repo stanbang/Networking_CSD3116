@@ -2,6 +2,9 @@
 #include <inttypes.h>
 #include <string.h>
 #include <time.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <openssl/evp.h>
 #include <dds/ddsrt/log.h>
 #include "common/audit_log.h"
@@ -23,8 +26,15 @@ bool audit_open(Audit *str_audit, const char *str_path)
     *str_audit = (Audit){0};
     int int_result = pthread_mutex_init(&str_audit->str_mutex, NULL);
     if (int_result) return false;
-    str_audit->str_file = fopen(str_path, "w");
-    if (!str_audit->str_file) { pthread_mutex_destroy(&str_audit->str_mutex); return false; }
+    char str_default[] = "build/server-audit.XXXXXX";
+    int int_fd = str_path ? open(str_path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600) :
+                           mkstemp(str_default);
+    if (int_fd < 0) { pthread_mutex_destroy(&str_audit->str_mutex); return false; }
+    const char *str_created = str_path ? str_path : str_default;
+    if (fcntl(int_fd, F_SETFD, FD_CLOEXEC) < 0 || !(str_audit->str_file = fdopen(int_fd, "w"))) {
+        close(int_fd); unlink(str_created); pthread_mutex_destroy(&str_audit->str_mutex); return false;
+    }
+    printf("AUDIT_FILE %s\n", str_created);
     return true;
 }
 
