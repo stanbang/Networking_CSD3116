@@ -1,4 +1,0 @@
-PASS wrong-ca: no admission, client exit=1, legitimate peer remains alive
-PASS no-cert: no admission, client exit=1, legitimate peer remains alive
-SERVER_SUMMARY joins=1 rejects=0 leaves=1 timeouts=0 invalid=0 stale=0 peak=1 inputs=59 rate_hits=0 auth_failures=6 middleware_events=7 moves=0 shots=0 destroyed=0 splits=0 hits=1 respawns=1 gameovers=0 restarts=0 wraps=0 snapshots=132 points=0 ticks=412
-PASS rejected peers used no slot; authentication and unauthenticated-discovery audit evidence verified

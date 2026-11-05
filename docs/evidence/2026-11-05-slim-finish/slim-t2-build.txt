@@ -1,6 +1,0 @@
-mkdir -p build/gen
-cd build/gen && idlc -l c ../../idl/messages.idl
-mkdir -p build/release
-mkdir -p build/release
-cc -std=gnu11 -O2 -g -Wall -Wextra -Wformat=2 -Wformat-security -fstack-protector-strong -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 -fPIE  -Isrc -Ibuild/gen -isystem third_party   src/server/main.c src/server/net_server.c src/common/audit_log.c src/common/event_queue.c src/common/frame.c src/common/net.c src/common/options.c src/common/protocol.c src/common/security.c src/common/sim.c build/gen/messages.c -o build/release/server -pie -Wl,-z,relro,-z,now,-z,noexecstack  -lddsc  -lssl -lcrypto  -pthread -lm
-cc -std=gnu11 -O2 -g -Wall -Wextra -Wformat=2 -Wformat-security -fstack-protector-strong -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 -fPIE  -Isrc -Ibuild/gen -isystem third_party    src/client/client_game.c src/client/main.c src/client/net_client.c src/client/render.c src/common/audit_log.c src/common/event_queue.c src/common/frame.c src/common/net.c src/common/options.c src/common/protocol.c src/common/security.c src/common/sim.c build/gen/messages.c -o build/release/client -pie -Wl,-z,relro,-z,now,-z,noexecstack  -lddsc  -lglfw  -lGL -lm -lssl -lcrypto  -pthread

@@ -1,4 +1,0 @@
-PASS bash syntax (no privileged capture executed)
-PASS invalid duration/path rejected before capture
-PASS offline IPv4 RTPS filter: 1 matching packet, complete 2042 bytes; non-RTPS excluded
-NOT RUN: privileged live capture; confidentiality not established by this fixture

@@ -1,6 +1,5 @@
 @echo off
-rem Start DDS Asteroids in the default Ubuntu WSL distribution. Team/Codex, 2026-11-05.
-setlocal
+rem Start DDS Asteroids in the default Ubuntu WSL distribution. setlocal
 title DDS Asteroids
 where wsl.exe >nul 2>nul
 if errorlevel 1 (

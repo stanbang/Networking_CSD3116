@@ -1,5 +1,0 @@
-WSL kernel: 6.18.54.1-microsoft-standard-WSL2
-PASS linked libddsc.so.0debian
-PASS linked libglfw.so.3
-PASS linked libGL.so.1
-PASS no remaining game/Xvfb processes
