@@ -7,6 +7,7 @@
 #include <string.h>
 #include <stb_easy_font.h>
 #include "client/client.h"
+#include "common/account_protocol.h"
 #define AST_PARTICLES 256
 typedef struct { char str_text[160]; int int_quads; _Alignas(16) char arr_vertices[16384]; } Text;
 typedef struct { float flt_x,flt_y,flt_vx,flt_vy,flt_life; } Particle;
@@ -183,7 +184,15 @@ static void hud(Renderer *str_renderer,Client *str_client,const Frame *str_frame
         glColor3fv(arr_colors[str_ship->int_player_id-1]);text_draw(&str_renderer->arr_players[int_i],str_text,24,80+int_i*16,1.2f);
     }
     glColor3f(0.4f,0.48f,0.63f);text_draw(&str_renderer->str_controls,"ARROWS: TURN / THRUST    SPACE: FIRE    R: RESTART",110,575,1.5f);
-    if(str_frame->b_gameover) {
+    if (str_frame->b_timeout_end) {
+        glColor3f(1,0.4f,0.4f);text_draw(&str_renderer->str_over,"ROUND ENDED",210,265,4);
+        glColor3f(0.8f,0.85f,1);text_draw(&str_renderer->str_restart,"PLAYER AWAY OVER 30 SECONDS",170,325,2);
+    } else if (str_frame->b_paused) {
+        if (str_frame->int_reconnect_seconds)
+            snprintf(str_text,sizeof(str_text),"WAITING FOR PLAYER - %us TO RETURN",str_frame->int_reconnect_seconds);
+        else snprintf(str_text,sizeof(str_text),"WAITING FOR SECOND PLAYER");
+        glColor3f(1,0.8f,0.3f);text_draw(&str_renderer->str_restart,str_text,145,300,2);
+    } else if(str_frame->b_gameover) {
         glColor3f(1,0.4f,0.4f);text_draw(&str_renderer->str_over,"GAME OVER",230,265,5);
         glColor3f(0.8f,0.85f,1);text_draw(&str_renderer->str_restart,"PRESS R TO RESTART",250,325,2);
     }
@@ -294,8 +303,8 @@ static void login_draw(Renderer *str_renderer, LoginForm *str_form, const LoginV
     glColor3f(0.45f,0.9f,1);
     text_draw(&str_renderer->str_title, "DDS ASTEROIDS", 238, 100, 3);
     const char *str_status = str_view->int_phase == LOGIN_ENDING ? "Signing out..." :
-        str_view->int_phase == LOGIN_PENDING ? "Connecting and authenticating..." :
-        !atomic_load(&str_form->ptr_client->b_ready) ? "Starting secure DDS..." : "Certificate and account required";
+        str_view->int_phase == LOGIN_PENDING ? "Checking your account..." :
+        !atomic_load(&str_form->ptr_client->b_ready) ? "Connecting to the game server..." : "Sign in or create an account";
     text_draw(&str_renderer->arr_login[0], str_status, 156, 156, 1.6f);
     if (str_view->int_phase == LOGIN_FORM) {
         const LoginCommand *str_input = &str_form->str_input;
@@ -304,17 +313,24 @@ static void login_draw(Renderer *str_renderer, LoginForm *str_form, const LoginV
         text_draw(&str_renderer->arr_login[1], str_text, 156, 217, 1.8f);
         snprintf(str_text, sizeof(str_text), "%s PASSWORD  %s", str_form->b_password_focus ? ">" : " ", str_mask);
         text_draw(&str_renderer->arr_login[2], str_text, 156, 250, 1.5f);
-        snprintf(str_text, sizeof(str_text), "F2  Remember me: %s", str_input->b_remember ? "ON" : "OFF");
+        snprintf(str_text, sizeof(str_text), "F2  Stay signed in: %s", str_input->b_remember ? "ON" : "OFF");
         text_draw(&str_renderer->arr_login[3], str_text, 156, 290, 1.5f);
-        text_draw(&str_renderer->arr_login[4], "TAB  Next field    ENTER  Sign in    SHIFT+ENTER  Register", 156, 335, 1.25f);
+        text_draw(&str_renderer->arr_login[4], "ENTER: Sign in    SHIFT+ENTER: Create account", 156, 335, 1.25f);
         if (str_view->b_remembered)
-            text_draw(&str_renderer->arr_login[5], "F3  Forget saved login", 156, 357, 1.4f);
+            text_draw(&str_renderer->arr_login[5], "TAB: Switch fields    F3: Forget saved login", 156, 357, 1.4f);
+        else
+            text_draw(&str_renderer->arr_login[5], "TAB: Switch between username and password", 156, 357, 1.25f);
     }
     glColor3f(1,0.65f,0.45f);
-    if (str_form->b_format_error)
-        text_draw(&str_renderer->arr_login[6], "Use 3-24 lowercase letters, digits or _, and 12-128 printable password bytes", 107, 397, 1.15f);
-    else if (str_view->b_error)
+    if (str_form->b_format_error) {
+        const LoginCommand *str_input = &str_form->str_input;
+        const char *str_hint = !account_username_valid(str_input->arr_name, str_input->int_name_length) ?
+            "Username: 3-24 characters (a-z, 0-9 or _)" : "Password must be 6-128 characters long";
+        text_draw(&str_renderer->arr_login[6], str_hint, 156, 397, 1.3f);
+    } else if (str_view->b_error)
         text_draw(&str_renderer->arr_login[6], login_status_text(str_view->int_status), 156, 397, 1.4f);
+    else if (str_view->int_phase == LOGIN_FORM)
+        text_draw(&str_renderer->arr_login[6], "Password: at least 6 characters", 156, 397, 1.3f);
     text_draw(&str_renderer->arr_login[7], profile_message(str_view->int_profile_notice), 156, 430, 1.4f);
     text_draw(&str_renderer->arr_login[8], "ESC  Close", 156, 465, 1.4f);
 }
@@ -361,7 +377,7 @@ bool render_run(Client *str_client,uint64_t int_deadline)
     glfwSetCharCallback(str_window, login_character);
     glfwSetKeyCallback(str_window, login_key);
     puts("CLIENT_LOGIN_READY");
-    while(!client_interrupted()&&!glfwWindowShouldClose(str_window)&&
+    while(!client_interrupted()&&!client_round_ended(str_client)&&!glfwWindowShouldClose(str_window)&&
         (!atomic_load(&str_client->b_stop)||atomic_load(&str_client->b_rejected))&&monotonic_ns()<int_deadline) {
         glfwPollEvents();background();
         LoginView str_view;

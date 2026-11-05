@@ -58,3 +58,9 @@ __pycache__/
 *.profile
 l[1-6]-*.lock
 accounts.lock
+
+# Public offline SDK is distributed separately in the verified source ZIP.
+portable/linux-x86_64/
+
+!portable/generated/messages.c
+!portable/generated/messages.h

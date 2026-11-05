@@ -6,7 +6,8 @@
 #include "common/frame.h"
 #include "server/accounts.h"
 typedef struct {
-    bool b_active;
+    bool b_active, b_disconnected;
+    uint64_t int_generation;
     unsigned int int_identity;
     uint8_t arr_nonce[16];
     uint64_t int_session, int_seq, int_seen;
@@ -30,6 +31,9 @@ typedef struct {
     Accounts *ptr_accounts;
     uint8_t arr_boot_id[16];
     uint64_t int_round;
+    bool b_started, b_paused, b_timeout_end;
+    uint16_t int_reconnect_seconds;
+    uint64_t int_round_end;
     uint8_t arr_used_nonce[AST_IDENTITIES][AST_JOIN_HISTORY][16];
     unsigned int arr_nonce_count[AST_IDENTITIES];
     uint64_t int_tick;

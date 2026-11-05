@@ -64,6 +64,8 @@ static void receive_snapshot(Client *str_client, Network *str_net, const Ast_Sna
             str_snapshot->int_tick,(unsigned int)str_snapshot->b_gameover,str_snapshot->int_wave);
         str_net->b_gameover=str_snapshot->b_gameover;
     }
+    if (str_snapshot->b_timeout_end && !atomic_load(&str_client->int_end_deadline))
+        atomic_store(&str_client->int_end_deadline, monotonic_ns() + AST_END_DISPLAY_NS);
     Frame str_frame = {0}; frame_from_wire(&str_frame,str_snapshot);
     mutex_lock(&str_client->str_mutex);
     str_client->arr_frames[str_client->int_head] = str_frame;

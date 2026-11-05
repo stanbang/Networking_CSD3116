@@ -1,19 +1,30 @@
+# Final runtime integration,2026-11-05
+
+The selected account/password/SQLite implementation is integrated with the30second crash/rejoin reservation. The verified runtime is now in Networking_CSD3116; every previous root file except preserved .git was moved into root-before-account-promotion in this archive. Full development source, tests and docs remain in Networking_CSD3116_accounts_c50af1e. The tested ZIP contains runtime source, launch/build/provision scripts, generated DDS source, public dependency headers/libraries, required license records and RUN_OFFLINE.md. No private keys, profiles, databases, captures, logs or Git history are in the ZIP.
+
+Ubuntu24.04 x86_64 under WSL2/WSLg with an existing GCC C toolchain is required. Run bash run.sh from the extracted DDS_Asteroids directory. No packages or downloads are invoked. Build-only: bash tools/build_portable.sh.
+
+Actual final outputs (offline-final-verification.txt, exit0):
+PASS bundled Python modules sqlite3/ssl/ctypes/fcntl/json
+PASS fresh ZIP extraction: offline compile, fresh certificate provisioning, authenticated two-client game and exit0
+PASS fresh ZIP bundled software OpenGL: two visible GLFW windows, registration, authenticated joins, keyboard input, screenshot, exit0
+PASS offline extracted two-minute two-client soak: exit0 joins2 timeouts0 invalid0
+
+The fresh-extraction test blocked apt,apt-get,sudo,make,pkg-config,idlc. New screenshot gui-offline.png inspected once: both players connected, separate player1/player2 HUD, asteroids, ships, firing and distinct account names.
+
+Native account regression and hardening: account-final-regression.txt, exit0. PIE/NX/RELRO/BIND_NOW/canary references for both binaries; protocol/sim/event/account-store unit checks pass. Certificate-only admission, forged account session, unknown account and rapid retry rejected. Server-earned score420 persisted. Leaderboard, remembered-token rotation/replay rejection/certificate binding/logout/forget all passed.
+
+Reconnect: account-reconnect-test-02.txt exit0. Same-account/certificate crash reclaim kept player1. Score260->660, lives3, cumulative distance166663->306794. On second crash, entire round/server/surviving client ended with exit0 after31.981seconds including final display. Protocol version4 prevents silent compatibility with older game messages. Countdown boundary30 accepted/31 rejected (countdown-boundary-test.txt exit0).
+
+Known limitations remain: external packet capture missing (previous human capture had0packets), no two-machine run, no controlled idleCPU before/after or full before/after performance measurements. Historical TSan/Valgrind dependency findings remain open, not rerun or cleared. Leave ACK warning fallback remains previously approved. During the terminal round-end interval, already in-flight inputs can produce session-drop audit records. WSLg desktop human acceptance has not been substituted by Xvfb automation. Slides/video/peer evaluation remain team deliverables. These are not claims of full rubric completion.
+
+No new commit or push was performed. The final ZIP is local, not a published clean Git revision.
+
+# Historical evidence retained for provenance
+
+The following concerns the earlier username game, not a new claim about the final account ZIP. Final account results are above.
+
 # Evidence for slides - 5 November 2026
-
-## Jordain's account handoff
-
-The account build adds mandatory certificate-bound login, SQLite best scores and leaderboard, and rotating Remember Me tokens. [Automated results and reproduction](TEST_REPORT.md#j1j4-account-verification--5-november-2026). [Masked login](evidence/2026-11-05-accounts/client1-masked-login.png). [Player 1](evidence/2026-11-05-accounts/client1-10s.png) and [player 2](evidence/2026-11-05-accounts/client2-10s.png) after ten seconds.
-
-For a short walkthrough, follow `idl/accounts.idl` and `tools/gen_certs.sh` for topic authority, `src/server/accounts.c` for the challenge and single storage worker, `src/server/main.c` for simulation score capture, `src/server/account_store.c` for scrypt and transactions, and `src/client/profile.c` for the client token file.
-
-Stanley's manual acceptance checklist:
-
-1. Use the same current certificate bundle across launches. Register two distinct accounts and confirm that both connected windows accept separate movement and firing inputs.
-2. Earn a score, close the players and restart the server through the same launcher. Sign in and open the leaderboard with B. Check the saved best against the first run.
-3. Enable F2 for one player. Close the local session and relaunch. Check that player resumes and the other player receives the login form.
-4. Press F3 during play, close and relaunch. Confirm the forgotten profile requires login. Sign in, press L and confirm the game returns to the login form.
-
-The earlier slim checkpoint inventory follows.
 
 This is an evidence inventory, not slides or a claim that the assignment rubric is fully satisfied. Slim finish mode excludes further GUI investigation, TSan/Valgrind dependency investigation, two-computer testing, slide production and video production. No new benchmark or sanitizer run was performed. T3 was approved by the user. T4 live capture/analysis remains pending. README, handover, AI-use notes and source-ZIP instructions are updated in RUN_AND_VERIFY.md; no final archive/submission is claimed.
 

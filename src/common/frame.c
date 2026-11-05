@@ -47,6 +47,8 @@ void frame_to_wire(Frame *str_frame, Ast_Snapshot *str_snapshot)
 {
     *str_snapshot = (Ast_Snapshot){.int_version=AST_VERSION,.int_seq=str_frame->int_seq,
         .int_tick=str_frame->int_tick,.int_wave=str_frame->int_wave,.b_gameover=str_frame->b_gameover,
+        .b_paused=str_frame->b_paused,.b_timeout_end=str_frame->b_timeout_end,
+        .int_reconnect_seconds=str_frame->int_reconnect_seconds,
         .arr_ships={._maximum=AST_PLAYERS,._length=str_frame->int_ships,._buffer=str_frame->arr_ships},
         .arr_bullets={._maximum=AST_BULLETS,._length=str_frame->int_bullets,._buffer=str_frame->arr_bullets},
         .arr_asteroids={._maximum=AST_ASTEROIDS,._length=str_frame->int_asteroids,._buffer=str_frame->arr_asteroids}};
@@ -57,6 +59,8 @@ void frame_from_wire(Frame *str_frame, const Ast_Snapshot *str_snapshot)
 {
     *str_frame = (Frame){.int_tick=str_snapshot->int_tick,.int_seq=str_snapshot->int_seq,
         .int_received=monotonic_ns(),.int_wave=str_snapshot->int_wave,.b_gameover=str_snapshot->b_gameover,
+        .b_paused=str_snapshot->b_paused,.b_timeout_end=str_snapshot->b_timeout_end,
+        .int_reconnect_seconds=str_snapshot->int_reconnect_seconds,
         .int_ships=str_snapshot->arr_ships._length,.int_bullets=str_snapshot->arr_bullets._length,
         .int_asteroids=str_snapshot->arr_asteroids._length};
     if (str_frame->int_ships) memcpy(str_frame->arr_ships,str_snapshot->arr_ships._buffer,str_frame->int_ships*sizeof(Ast_Ship));

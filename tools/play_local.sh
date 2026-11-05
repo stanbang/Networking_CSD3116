@@ -49,7 +49,11 @@ usable_bundle() {
   done
 }
 
-make -j2
+if [[ -f portable/linux-x86_64/manifest.json ]]; then
+  bash tools/build_portable.sh
+else
+  make -j2
+fi
 str_security=$str_security_arg
 if [[ -z $str_security_arg && $b_fresh == false && -f build/local-security-dir ]]; then
   IFS= read -r str_security < build/local-security-dir || true
@@ -70,6 +74,8 @@ if ! usable_bundle "$str_security"; then
   printf '%s\n' "$str_security" > build/local-security-dir
 fi
 
+# Reconnect reuses the active CA, including an explicitly selected bundle.
+printf '%s\n' "$str_security" > build/local-active-security-dir
 str_run=$(mktemp -d build/local-session.XXXXXXXX)
 str_headless_dir=
 arr_server_flags=()
@@ -140,6 +146,6 @@ int_client2=$!
 wait_client "$int_client2" "$str_run/client2.log"
 printf 'Local session started. Logs: %s server=%s client1=%s client2=%s\n' "$str_run" "$int_server" "$int_client1" "$int_client2"
 int_status=0
-wait -n "$int_server" "$int_client1" "$int_client2" || int_status=$?
+wait "$int_server" || int_status=$?
 if (( int_status )); then echo "A game process failed. See $str_run" >&2; fi
 exit "$int_status"

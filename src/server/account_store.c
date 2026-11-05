@@ -38,7 +38,7 @@ static const char str_schema[] =
       "account_id INTEGER PRIMARY KEY CHECK(account_id > 0),"
       "username TEXT NOT NULL UNIQUE CHECK(length(username) BETWEEN 3 AND 24 "
         "AND username NOT GLOB '*[^a-z0-9_]*' AND instr(username,char(0))=0),"
-      "identity_channel INTEGER NOT NULL UNIQUE CHECK(identity_channel BETWEEN 1 AND 6),"
+      "identity_channel INTEGER NOT NULL CHECK(identity_channel BETWEEN 1 AND 6),"
       "password_salt BLOB NOT NULL CHECK(length(password_salt)=16),"
       "password_verifier BLOB NOT NULL CHECK(length(password_verifier)=32),"
       "scrypt_n INTEGER NOT NULL CHECK(scrypt_n=131072),"
@@ -47,9 +47,6 @@ static const char str_schema[] =
       "password_generation INTEGER NOT NULL DEFAULT 1 CHECK(password_generation>0),"
       "created_unix_s INTEGER NOT NULL CHECK(created_unix_s>=0),"
       "UNIQUE(account_id,identity_channel));"
-    "CREATE TRIGGER accounts_capacity BEFORE INSERT ON accounts "
-      "WHEN (SELECT count(*) FROM accounts)>=6 "
-      "BEGIN SELECT RAISE(ABORT,'account capacity reached'); END;"
     "CREATE TABLE best_scores ("
       "account_id INTEGER PRIMARY KEY REFERENCES accounts(account_id),"
       "best_score INTEGER NOT NULL CHECK(best_score BETWEEN 0 AND 4294967295),"
@@ -64,7 +61,30 @@ static const char str_schema[] =
       "issued_unix_s INTEGER NOT NULL CHECK(issued_unix_s>=0),"
       "expires_unix_s INTEGER NOT NULL CHECK(expires_unix_s>issued_unix_s),"
       "FOREIGN KEY(account_id,identity_channel) REFERENCES accounts(account_id,identity_channel));"
-    "PRAGMA user_version=1; COMMIT;";
+    "PRAGMA user_version=2; COMMIT;";
+
+
+/* Run only after the legacy database passed validation and its exclusive lock is held. */
+static const char str_migrate_accounts[] =
+    "BEGIN IMMEDIATE;"
+    "CREATE TABLE accounts_v2 ("
+      "account_id INTEGER PRIMARY KEY CHECK(account_id > 0),"
+      "username TEXT NOT NULL UNIQUE CHECK(length(username) BETWEEN 3 AND 24 "
+        "AND username NOT GLOB '*[^a-z0-9_]*' AND instr(username,char(0))=0),"
+      "identity_channel INTEGER NOT NULL CHECK(identity_channel BETWEEN 1 AND 6),"
+      "password_salt BLOB NOT NULL CHECK(length(password_salt)=16),"
+      "password_verifier BLOB NOT NULL CHECK(length(password_verifier)=32),"
+      "scrypt_n INTEGER NOT NULL CHECK(scrypt_n=131072),"
+      "scrypt_r INTEGER NOT NULL CHECK(scrypt_r=8),"
+      "scrypt_p INTEGER NOT NULL CHECK(scrypt_p=1),"
+      "password_generation INTEGER NOT NULL DEFAULT 1 CHECK(password_generation>0),"
+      "created_unix_s INTEGER NOT NULL CHECK(created_unix_s>=0),"
+      "UNIQUE(account_id,identity_channel));"
+    "INSERT INTO accounts_v2 SELECT * FROM accounts;"
+    "DROP TRIGGER accounts_capacity;"
+    "DROP TABLE accounts;"
+    "ALTER TABLE accounts_v2 RENAME TO accounts;"
+    "PRAGMA user_version=2;";
 
 static bool directory_mode(int int_fd, bool b_leaf)
 {
@@ -166,17 +186,30 @@ static bool scalar(sqlite3 *ptr_db, const char *str_sql, const char *str_text, s
     return finish(ptr_stmt, b_ok && sqlite3_step(ptr_stmt) == SQLITE_DONE);
 }
 
-static bool schema_valid(sqlite3 *ptr_db)
+static bool schema_valid(sqlite3 *ptr_db, int int_version)
 {
     sqlite3_stmt *ptr_stmt = NULL;
-    if (!scalar(ptr_db, "PRAGMA user_version", NULL, 1) ||
+    if (!scalar(ptr_db, "PRAGMA user_version", NULL, int_version) ||
         !scalar(ptr_db, "PRAGMA integrity_check(1)", "ok", 0) ||
         !scalar(ptr_db, "SELECT count(*) FROM sqlite_schema WHERE "
             "(type='table' AND name IN ('accounts','best_scores','resume_tokens')) "
-            "OR (type='trigger' AND name='accounts_capacity')", NULL, 4) ||
+            "OR (type='trigger' AND name='accounts_capacity')", NULL, int_version == 1 ? 4 : 3) ||
         sqlite3_prepare_v2(ptr_db, "PRAGMA foreign_key_check", -1, &ptr_stmt, NULL) != SQLITE_OK)
         return false;
     return finish(ptr_stmt, sqlite3_step(ptr_stmt) == SQLITE_DONE);
+}
+
+/* Foreign keys are restored on both commit and rollback; child rows keep their IDs. */
+static bool migrate_accounts(sqlite3 *ptr_db)
+{
+    if (!sql_exec(ptr_db, "PRAGMA foreign_keys=OFF") ||
+        !scalar(ptr_db, "PRAGMA foreign_keys", NULL, 0)) return false;
+    bool b_ok = sql_exec(ptr_db, str_migrate_accounts) && schema_valid(ptr_db, 2);
+    if (b_ok) b_ok = sql_exec(ptr_db, "COMMIT");
+    if (!b_ok) (void)sql_exec(ptr_db, "ROLLBACK");
+    bool b_foreign_keys = sql_exec(ptr_db, "PRAGMA foreign_keys=ON") &&
+        scalar(ptr_db, "PRAGMA foreign_keys", NULL, 1);
+    return b_ok && b_foreign_keys;
 }
 
 static bool open_database(AccountStore *str_store, const char *str_directory, bool b_new)
@@ -195,7 +228,9 @@ static bool open_database(AccountStore *str_store, const char *str_directory, bo
         !scalar(ptr_db, "PRAGMA foreign_keys", NULL, 1) ||
         !scalar(ptr_db, "PRAGMA synchronous", NULL, 2) ||
         !scalar(ptr_db, "PRAGMA journal_mode", "delete", 0)) return false;
-    return (!b_new || sql_exec(ptr_db, str_schema)) && schema_valid(ptr_db);
+    if (b_new) return sql_exec(ptr_db, str_schema) && schema_valid(ptr_db, 2);
+    if (scalar(ptr_db, "PRAGMA user_version", NULL, 2)) return schema_valid(ptr_db, 2);
+    return schema_valid(ptr_db, 1) && migrate_accounts(ptr_db);
 }
 
 bool account_store_open(AccountStore *str_store, const char *str_directory)
@@ -247,7 +282,7 @@ static bool username_valid(const char *str_name, size_t int_length)
 
 static bool password_valid(const uint8_t *arr_password, size_t int_length)
 {
-    if (!arr_password || int_length < 12 || int_length > 128) return false;
+    if (!arr_password || int_length < 6 || int_length > 128) return false;
     for (size_t int_i = 0; int_i < int_length; ++int_i)
         if (arr_password[int_i] < 32 || arr_password[int_i] > 126) return false;
     return true;
@@ -379,7 +414,7 @@ static StoreResult insert_account(sqlite3 *ptr_db, unsigned int int_identity, co
     const char str_sql[] = "INSERT INTO accounts(username,identity_channel,password_salt,"
         "password_verifier,scrypt_n,scrypt_r,scrypt_p,created_unix_s) "
         "SELECT ?1,?2,?3,?4,?5,?6,?7,?8 WHERE NOT EXISTS "
-        "(SELECT 1 FROM accounts WHERE username=?1 OR identity_channel=?2) "
+        "(SELECT 1 FROM accounts WHERE username=?1) "
         "ON CONFLICT DO NOTHING";
     sqlite3_stmt *ptr_stmt = NULL;
     if (sqlite3_prepare_v2(ptr_db, str_sql, -1, &ptr_stmt, NULL) != SQLITE_OK) return STORE_ERROR;

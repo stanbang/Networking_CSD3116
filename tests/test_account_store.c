@@ -120,14 +120,17 @@ static void test_registration(uint8_t arr_password[16], AccountGrant *str_alpha,
     CHECK(account_store_auth(&str_store, false, 2, "alpha", arr_password, 16, false, &str_unused) == STORE_INVALID_CREDENTIALS);
     CHECK(account_store_auth(&str_store, false, 1, "missing", arr_password, 16, false, &str_unused) == STORE_INVALID_CREDENTIALS);
     CHECK(account_store_auth(&str_store, true, 2, "alpha", arr_password, 16, false, &str_unused) == STORE_REGISTRATION_DENIED);
-    CHECK(account_store_auth(&str_store, true, 1, "new_name", arr_password, 16, false, &str_unused) == STORE_REGISTRATION_DENIED);
+    CHECK(account_store_auth(&str_store, true, 1, "alpha", arr_password, 16, false, &str_unused) == STORE_REGISTRATION_DENIED);
     CHECK(account_store_auth(&str_store, true, 2, "bravo", arr_password, 16, false, str_bravo) == STORE_OK);
     CHECK(str_bravo->str_account.int_account_id != str_alpha->str_account.int_account_id && !str_bravo->b_token_present);
 
     int_fail_random_call = 2;
-    CHECK(account_store_auth(&str_store, true, 3, "charlie", arr_password, 16, true, &str_unused) == STORE_ERROR);
+    CHECK(account_store_auth(&str_store, true, 3, "charlie", arr_password, 6, true, &str_unused) == STORE_ERROR);
     CHECK(!str_unused.b_token_present && str_unused.str_account.int_account_id == 0);
-    CHECK(account_store_auth(&str_store, true, 3, "charlie", arr_password, 16, false, &str_unused) == STORE_OK);
+    CHECK(account_store_auth(&str_store, true, 3, "charlie", arr_password, 6, false, &str_unused) == STORE_OK);
+    CHECK(account_store_auth(&str_store, false, 3, "charlie", arr_password, 6, false, &str_unused) == STORE_OK);
+    CHECK(account_store_auth(&str_store, false, 3, "charlie", arr_password, 5, false, &str_unused) == STORE_INVALID_CREDENTIALS);
+    puts("PASS six-letter password registration/login; five-letter password rejected");
     OPENSSL_cleanse(arr_wrong, sizeof(arr_wrong));
     OPENSSL_cleanse(&str_unused, sizeof(str_unused));
     puts("PASS registration binding, generic rejection and rollback on RNG failure");
@@ -153,6 +156,69 @@ static void test_scores(uint64_t int_alpha, uint64_t int_bravo)
     CHECK(int_count == 3 && str_own.int_best_score == 240 && arr_rows[0].int_best_score == 240 && arr_rows[1].int_best_score == 180);
     CHECK(strcmp(arr_rows[0].str_username, "alpha") == 0 && strcmp(arr_rows[1].str_username, "bravo") == 0);
     puts("PASS score max and leaderboard persist across database reopen");
+}
+
+/* Hash actual stored values, including byte blobs, across migration without logging secrets. */
+static void account_rows_digest(uint8_t arr_digest[32])
+{
+    const char *arr_sql[] = {"SELECT * FROM accounts ORDER BY account_id",
+        "SELECT * FROM best_scores ORDER BY account_id", "SELECT * FROM resume_tokens ORDER BY account_id"};
+    EVP_MD_CTX *str_hash = EVP_MD_CTX_new();
+    CHECK(str_hash && EVP_DigestInit_ex(str_hash, EVP_sha256(), NULL) == 1);
+    for (size_t int_i = 0; int_i < 3; ++int_i) {
+        sqlite3_stmt *str_stmt = NULL;
+        CHECK(sqlite3_prepare_v2(str_store.ptr_db, arr_sql[int_i], -1, &str_stmt, NULL) == SQLITE_OK);
+        int int_step;
+        while ((int_step = sqlite3_step(str_stmt)) == SQLITE_ROW) {
+            for (int int_col = 0; int_col < sqlite3_column_count(str_stmt); ++int_col) {
+                int int_type = sqlite3_column_type(str_stmt, int_col);
+                const void *ptr_value = sqlite3_column_blob(str_stmt, int_col);
+                int int_bytes = sqlite3_column_bytes(str_stmt, int_col);
+                CHECK(EVP_DigestUpdate(str_hash, &int_type, sizeof(int_type)) == 1);
+                CHECK(EVP_DigestUpdate(str_hash, &int_bytes, sizeof(int_bytes)) == 1);
+                if (int_bytes) CHECK(EVP_DigestUpdate(str_hash, ptr_value, (size_t)int_bytes) == 1);
+            }
+        }
+        CHECK(int_step == SQLITE_DONE && sqlite3_finalize(str_stmt) == SQLITE_OK);
+    }
+    unsigned int int_size = 0;
+    CHECK(EVP_DigestFinal_ex(str_hash, arr_digest, &int_size) == 1 && int_size == 32);
+    EVP_MD_CTX_free(str_hash);
+}
+
+static void test_legacy_migration(void)
+{
+    /* Restore both legacy restrictions on the existing fixture before reopening it. */
+    const char *str_legacy = "CREATE UNIQUE INDEX legacy_identity_limit ON accounts(identity_channel);"
+        "CREATE TRIGGER accounts_capacity BEFORE INSERT ON accounts "
+        "WHEN (SELECT count(*) FROM accounts)>=6 "
+        "BEGIN SELECT RAISE(ABORT,'account capacity reached'); END; PRAGMA user_version=1;";
+    CHECK(sqlite3_exec(str_store.ptr_db, str_legacy, NULL, NULL, NULL) == SQLITE_OK);
+    uint8_t arr_before[32], arr_after[32];
+    account_rows_digest(arr_before);
+    CHECK(account_store_close(&str_store) && account_store_open(&str_store, str_root));
+    account_rows_digest(arr_after);
+    CHECK(CRYPTO_memcmp(arr_before, arr_after, sizeof(arr_before)) == 0);
+    CHECK(sqlite3_exec(str_store.ptr_db, "PRAGMA foreign_keys", NULL, NULL, NULL) == SQLITE_OK);
+    puts("PASS legacy migration preserves every account/score/token field byte-for-byte");
+}
+
+static void test_many_accounts(void)
+{
+    const uint8_t arr_digits[] = "123456";
+    AccountGrant str_grant = {0};
+    for (unsigned int int_i = 0; int_i < 12; ++int_i) {
+        char arr_name[24];
+        CHECK(snprintf(arr_name, sizeof(arr_name), "additional_%u", int_i) > 0);
+        CHECK(account_store_auth(&str_store, true, 1, arr_name, arr_digits, 6, false, &str_grant) == STORE_OK);
+        CHECK(account_store_auth(&str_store, false, 1, arr_name, arr_digits, 6, false, &str_grant) == STORE_OK);
+        CHECK(account_store_auth(&str_store, false, 2, arr_name, arr_digits, 6, false, &str_grant) == STORE_INVALID_CREDENTIALS);
+    }
+    CHECK(account_store_auth(&str_store, true, 2, "additional_0", arr_digits, 6, false, &str_grant) == STORE_REGISTRATION_DENIED);
+    CHECK(account_store_close(&str_store) && account_store_open(&str_store, str_root));
+    CHECK(account_store_auth(&str_store, false, 1, "additional_11", arr_digits, 6, false, &str_grant) == STORE_OK);
+    OPENSSL_cleanse(&str_grant, sizeof(str_grant));
+    puts("PASS twelve accounts on one player beyond old global cap; login/reopen/unique usernames and certificate binding");
 }
 
 static void test_stored_material(const AccountGrant *str_alpha)
@@ -318,8 +384,10 @@ int main(void)
     AccountGrant str_alpha, str_bravo;
     test_registration(arr_password, &str_alpha, &str_bravo);
     test_scores(str_alpha.str_account.int_account_id, str_bravo.str_account.int_account_id);
+    test_legacy_migration();
     test_stored_material(&str_alpha);
     test_tokens(arr_password, &str_alpha);
+    test_many_accounts();
     OPENSSL_cleanse(arr_password, sizeof(arr_password));
     OPENSSL_cleanse(&str_alpha, sizeof(str_alpha));
     OPENSSL_cleanse(&str_bravo, sizeof(str_bravo));

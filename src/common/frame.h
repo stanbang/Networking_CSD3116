@@ -10,7 +10,8 @@ typedef struct {
     uint32_t int_ships, int_bullets, int_asteroids;
     uint64_t int_tick, int_seq, int_received;
     uint16_t int_wave;
-    bool b_gameover;
+    bool b_gameover, b_paused, b_timeout_end;
+    uint16_t int_reconnect_seconds;
 } Frame;
 void frame_from_sim(Frame *str_frame, const Sim *str_sim);
 void frame_to_wire(Frame *str_frame, Ast_Snapshot *str_snapshot);

@@ -1,7 +1,9 @@
 /* Shared bounds and timing. Author: <team>, Codex assistance. Date: 2026-11-03. */
 #ifndef AST_CONFIG_H
 #define AST_CONFIG_H
-#define AST_VERSION 2
+#define AST_VERSION 4
+#define AST_RECONNECT_NS UINT64_C(30000000000)
+#define AST_END_DISPLAY_NS UINT64_C(2000000000)
 #define AST_PLAYERS 5
 #define AST_IDENTITIES 6
 #define AST_DOMAIN 42

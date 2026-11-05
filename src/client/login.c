@@ -98,16 +98,16 @@ void login_view(Client *str_client, LoginView *str_view)
 const char *login_status_text(uint16_t int_status)
 {
     switch (int_status) {
-    case AstAccount_INVALID_REQUEST: return "Invalid account request";
-    case AstAccount_INVALID_CREDENTIALS: return "Invalid credentials";
-    case AstAccount_ALREADY_ACTIVE: return "Account already active";
-    case AstAccount_RATE_LIMITED: return "Too many attempts. Try again shortly";
-    case AstAccount_BUSY: return "Server busy. Try again shortly";
-    case AstAccount_STORAGE_ERROR: return "Server account storage error";
-    case AstAccount_NOT_AUTHENTICATED: return "Account service unavailable or expired";
-    case AstAccount_CAPACITY: return "Account capacity reached";
-    case AstAccount_UNSUPPORTED_VERSION: return "Account protocol version mismatch";
-    case AstAccount_REGISTRATION_DENIED: return "Registration denied";
-    default: return "Account request failed";
+    case AstAccount_INVALID_REQUEST: return "Check your username and password format";
+    case AstAccount_INVALID_CREDENTIALS: return "Username or password is incorrect";
+    case AstAccount_ALREADY_ACTIVE: return "This player is already signed in";
+    case AstAccount_RATE_LIMITED: return "Please wait a moment before trying again";
+    case AstAccount_BUSY: return "Server is busy. Please try again";
+    case AstAccount_STORAGE_ERROR: return "Account service error. Please try again";
+    case AstAccount_NOT_AUTHENTICATED: return "Could not sign in. Please try again";
+    case AstAccount_CAPACITY: return "No room for more accounts on this server";
+    case AstAccount_UNSUPPORTED_VERSION: return "Game versions differ. Update both players";
+    case AstAccount_REGISTRATION_DENIED: return "Could not create account. Try a different username";
+    default: return "Could not sign in. Please try again";
     }
 }

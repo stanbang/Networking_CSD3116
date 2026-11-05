@@ -102,6 +102,7 @@ static bool entities_valid(const Ast_Snapshot *str_snapshot, unsigned int int_se
 bool snapshot_valid(const Ast_Snapshot *str_snapshot)
 {
     if (!str_snapshot || str_snapshot->int_version != AST_VERSION || !str_snapshot->int_seq ||
+        str_snapshot->int_reconnect_seconds > 30 ||
         !str_snapshot->int_wave || str_snapshot->int_tick > (uint64_t)AST_HZ * AST_MAX_DURATION ||
         !sequence_valid(str_snapshot->arr_ships._length,str_snapshot->arr_ships._maximum,AST_PLAYERS,str_snapshot->arr_ships._buffer) ||
         !sequence_valid(str_snapshot->arr_bullets._length,str_snapshot->arr_bullets._maximum,AST_BULLETS,str_snapshot->arr_bullets._buffer) ||

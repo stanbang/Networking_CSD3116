@@ -13,9 +13,15 @@ static void stop_signal(int int_signal) { (void)int_signal; b_signal = 1; }
 bool client_interrupted(void) { return b_signal != 0; }
 
 /* Bot input is state, never movement; simulation consumes it once per tick in P3. */
+bool client_round_ended(const Client *str_client)
+{
+    uint64_t int_end = atomic_load(&str_client->int_end_deadline);
+    return int_end && monotonic_ns() >= int_end;
+}
+
 static void headless_run(Client *str_client, uint64_t int_deadline)
 {
-    while (!b_signal && !atomic_load(&str_client->b_stop) && monotonic_ns() < int_deadline) {
+    while (!b_signal && !atomic_load(&str_client->b_stop) && !client_round_ended(str_client) && monotonic_ns() < int_deadline) {
         atomic_store(&str_client->int_keys, client_bot_keys(str_client));
         sleep_ns(UINT64_C(1000000000) / AST_HZ);
     }

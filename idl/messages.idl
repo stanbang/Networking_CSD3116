@@ -55,6 +55,9 @@ module Ast {
     long int_y;
   };
   @final struct Snapshot {
+    boolean b_paused;
+    boolean b_timeout_end;
+    unsigned short int_reconnect_seconds;
     unsigned short int_version;
     unsigned long long int_seq;
     unsigned long long int_tick;

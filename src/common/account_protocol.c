@@ -21,7 +21,7 @@ bool account_username_valid(const uint8_t *arr_name, size_t int_length)
 
 bool account_password_valid(const uint8_t *arr_password, size_t int_length)
 {
-    if (!arr_password || int_length < 12 || int_length > 128) return false;
+    if (!arr_password || int_length < 6 || int_length > 128) return false;
     for (size_t int_i = 0; int_i < int_length; ++int_i)
         if (arr_password[int_i] < 32 || arr_password[int_i] > 126) return false;
     return true;

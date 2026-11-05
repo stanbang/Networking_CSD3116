@@ -40,7 +40,9 @@ void server_release_slot(Server *str_server, unsigned int int_slot)
     Slot *str_slot = &str_server->arr_slots[int_slot];
     capture_score(str_server, int_slot);
     accounts_game_left(str_server->ptr_accounts, str_slot->int_identity, str_slot->arr_nonce);
-    *str_slot = (Slot){0};
+    /* Keep the ship/account reservation until reauthentication or round end. */
+    str_slot->b_disconnected = true;
+    str_slot->int_keys = 0;
 }
 
 /* Explicit local acceptance fixture, never enabled by a network message.
@@ -70,10 +72,11 @@ static void game_step(Server *str_server)
 {
     uint16_t arr_keys[AST_PLAYERS] = {0};
     bool b_restart_requested = false;
+    unsigned int int_active = 0;
     mutex_lock(&str_server->str_mutex);
     for (unsigned int int_i = 0; int_i < AST_PLAYERS; ++int_i) {
         const Slot *str_slot = &str_server->arr_slots[int_i];
-        uint64_t int_session = str_slot->b_active ? str_slot->int_session : 0;
+        uint64_t int_session = str_slot->b_active ? str_slot->int_generation : 0;
         if (str_server->arr_sim_session[int_i] != int_session) {
             capture_score(str_server, int_i);
             sim_connect(&str_server->str_sim, int_i, false);
@@ -82,14 +85,17 @@ static void game_step(Server *str_server)
             str_server->arr_score_owner[int_i] = (ScoreOwner){.int_account_id = str_slot->int_account_id,
                 .int_session = int_session, .int_identity = str_slot->int_identity};
         }
-        arr_keys[int_i] = str_slot->b_active ? str_slot->int_keys : 0;
+        if (str_slot->b_active && !str_slot->b_disconnected) ++int_active;
+        arr_keys[int_i] = str_slot->b_active && !str_slot->b_disconnected ? str_slot->int_keys : 0;
         b_restart_requested |= (arr_keys[int_i] & AST_KEY_RESTART) != 0;
     }
-    bool b_fixture=prepare_gameover_test(str_server);
+    if (int_active >= 2) str_server->b_started = true;
+    bool b_play = str_server->b_started && !str_server->b_paused && !str_server->b_timeout_end;
+    bool b_fixture=b_play && prepare_gameover_test(str_server);
     uint64_t int_over_before=str_server->str_sim.str_counts.int_gameovers;
     uint64_t int_restart_before=str_server->str_sim.str_counts.int_restarts;
     if (str_server->str_sim.b_gameover && b_restart_requested) capture_scores(str_server);
-    sim_tick(&str_server->str_sim, arr_keys);
+    if (b_play) sim_tick(&str_server->str_sim, arr_keys);
     bool b_over=str_server->str_sim.str_counts.int_gameovers!=int_over_before;
     bool b_restart=str_server->str_sim.str_counts.int_restarts!=int_restart_before;
     if (b_over) capture_scores(str_server);
@@ -104,21 +110,41 @@ static void game_step(Server *str_server)
 /* Main owns lease expiry; the network worker owns receipt. Shared slots are locked. */
 void server_expire(Server *str_server, uint64_t int_now)
 {
-    unsigned int arr_expired[AST_PLAYERS] = {0};
+    unsigned int arr_lost[AST_PLAYERS] = {0}; bool b_end = false;
     mutex_lock(&str_server->str_mutex);
     ++str_server->int_tick;
-    for (unsigned int int_i = 0; int_i < AST_PLAYERS; ++int_i) {
+    str_server->b_paused = !str_server->b_started;
+    str_server->int_reconnect_seconds = 0;
+    for (unsigned int int_i = 0; int_i < AST_PLAYERS && !str_server->b_timeout_end; ++int_i) {
         Slot *str_slot = &str_server->arr_slots[int_i];
-        if (str_slot->b_active && lease_expired(int_now, str_slot->int_seen)) {
-            arr_expired[int_i] = str_slot->int_identity;
+        if (!str_slot->b_active) continue;
+        uint64_t int_age = int_now >= str_slot->int_seen ? int_now - str_slot->int_seen : 0;
+        if (!str_slot->b_disconnected && int_age >= AST_LEASE_NS) {
             server_release_slot(str_server, int_i);
-            ++str_server->int_timeouts;
+            arr_lost[int_i] = str_slot->int_identity; ++str_server->int_timeouts;
+        }
+        if (!str_slot->b_disconnected) continue;
+        str_server->b_paused = true;
+        if (int_age >= AST_RECONNECT_NS) {
+            str_server->b_timeout_end = true; str_server->b_paused = false;
+            str_server->int_reconnect_seconds = 0;
+            str_server->int_round_end = int_now;
+            str_server->str_sim.b_gameover = true;
+            ++str_server->str_sim.str_counts.int_gameovers; b_end = true;
+        } else {
+            uint16_t int_left = (uint16_t)((AST_RECONNECT_NS - int_age + UINT64_C(999999999)) / UINT64_C(1000000000));
+            if (!str_server->int_reconnect_seconds || int_left < str_server->int_reconnect_seconds)
+                str_server->int_reconnect_seconds = int_left;
         }
     }
     mutex_unlock(&str_server->str_mutex);
-    for (unsigned int int_i = 0; int_i < AST_PLAYERS; ++int_i) if (arr_expired[int_i]) {
-        printf("SERVER_TIMEOUT identity=%u id=%u\n", arr_expired[int_i], int_i + 1);
-        audit_event(&str_server->str_audit, arr_expired[int_i], "TIMEOUT", "lease");
+    for (unsigned int int_i = 0; int_i < AST_PLAYERS; ++int_i) if (arr_lost[int_i]) {
+        printf("SERVER_DISCONNECTED identity=%u id=%u grace_seconds=30\n", arr_lost[int_i], int_i + 1);
+        audit_event(&str_server->str_audit, arr_lost[int_i], "DISCONNECTED", "reconnect-grace");
+    }
+    if (b_end) {
+        puts("GAME_EVENT round-ended reason=absence-over-30s");
+        audit_event(&str_server->str_audit, 0, "ROUND_END", "absence-over-30s");
     }
 }
 
@@ -185,6 +211,7 @@ int main(int int_argc, char **arr_argv)
         !atomic_load(&str_server.str_audit.b_failed); ++int_tick) {
         server_expire(&str_server, monotonic_ns());
         game_step(&str_server);
+        if (str_server.b_timeout_end && monotonic_ns() - str_server.int_round_end >= AST_END_DISPLAY_NS) break;
         int_next += UINT64_C(1000000000) / AST_HZ;
         uint64_t int_now = monotonic_ns();
         if (int_next > int_now) sleep_ns(int_next - int_now);

@@ -53,12 +53,33 @@ static int allocate_slot(Server *str_server, unsigned int int_identity, const As
             str_join->arr_nonce, int_account_id)) return -1;
     Slot *str_slot = &str_server->arr_slots[int_slot];
     *str_slot = (Slot){.b_active = true, .int_identity = int_identity,
-        .int_session = int_session, .int_seen = monotonic_ns(), .int_account_id = int_account_id};
+        .int_session = int_session, .int_generation = int_session, .int_seen = monotonic_ns(), .int_account_id = int_account_id};
     memcpy(str_slot->arr_nonce, str_join->arr_nonce, 16);
     unsigned int int_nonce_index = str_server->arr_nonce_count[int_identity - 1]++;
     memcpy(str_server->arr_used_nonce[int_identity - 1][int_nonce_index], str_join->arr_nonce, 16);
     ++str_server->int_joins;
     if (int_active + 1 > str_server->int_peak) str_server->int_peak = int_active + 1;
+    return int_slot;
+}
+
+/* A fresh account proof may reclaim only its own disconnected ship. */
+static int resume_slot(Server *str_server, int int_slot, const Ast_Join *str_join,
+                       uint64_t int_session, uint64_t int_account_id)
+{
+    Slot *str_slot = &str_server->arr_slots[int_slot];
+    uint64_t int_now = monotonic_ns();
+    if (!str_slot->b_disconnected || str_slot->int_account_id != int_account_id ||
+        int_now - str_slot->int_seen >= AST_RECONNECT_NS ||
+        !nonce_available(str_server, str_slot->int_identity, str_join->arr_nonce) ||
+        !accounts_game_joined(str_server->ptr_accounts, str_slot->int_identity,
+                              str_join->arr_nonce, int_account_id)) return -2;
+    str_slot->b_disconnected = false;
+    str_slot->int_session = int_session;
+    str_slot->int_seen = int_now; str_slot->int_seq = 0; str_slot->int_keys = 0;
+    memcpy(str_slot->arr_nonce, str_join->arr_nonce, 16);
+    unsigned int int_index = str_server->arr_nonce_count[str_slot->int_identity - 1]++;
+    memcpy(str_server->arr_used_nonce[str_slot->int_identity - 1][int_index], str_join->arr_nonce, 16);
+    ++str_server->int_joins;
     return int_slot;
 }
 
@@ -68,9 +89,10 @@ static void admit(Server *str_server, unsigned int int_identity, const Ast_Join 
 {
     mutex_lock(&str_server->str_mutex);
     uint64_t int_account_id = 0;
-    int int_slot = accounts_authorize_join(str_server->ptr_accounts, int_identity, str_join->arr_nonce,
+    int int_slot = !str_server->b_timeout_end && accounts_authorize_join(str_server->ptr_accounts, int_identity, str_join->arr_nonce,
         &int_account_id) ? find_identity(str_server, int_identity) : -2;
-    if (int_slot >= 0 && memcmp(str_server->arr_slots[int_slot].arr_nonce, str_join->arr_nonce, 16) != 0) int_slot = -2;
+    if (int_slot >= 0 && memcmp(str_server->arr_slots[int_slot].arr_nonce, str_join->arr_nonce, 16) != 0)
+        int_slot = resume_slot(str_server, int_slot, str_join, int_session, int_account_id);
     if (int_slot == -1) int_slot = nonce_available(str_server, int_identity, str_join->arr_nonce) ?
         allocate_slot(str_server, int_identity, str_join, int_session, int_account_id) : -2;
     if (int_slot >= 0) {
@@ -112,7 +134,8 @@ static const char *session_check(Server *str_server, unsigned int int_identity, 
                                  uint64_t int_session, uint64_t int_seq)
 {
     int int_slot = find_identity(str_server, int_identity);
-    if (int_slot < 0 || str_server->arr_slots[int_slot].int_session != int_session) return "session";
+    if (int_slot < 0 || str_server->b_timeout_end || str_server->arr_slots[int_slot].b_disconnected ||
+        str_server->arr_slots[int_slot].int_session != int_session) return "session";
     if ((unsigned int)int_slot + 1 != int_id) return "spoof";
     if (int_seq <= str_server->arr_slots[int_slot].int_seq) return "replay";
     return NULL;
@@ -296,6 +319,9 @@ static bool publish_snapshot(Server *str_server, Network *str_net)
     Frame str_frame = {0}; Ast_Snapshot str_snapshot = {0};
     mutex_lock(&str_server->str_mutex);
     frame_from_sim(&str_frame, &str_server->str_sim);
+    str_frame.b_paused = str_server->b_paused;
+    str_frame.b_timeout_end = str_server->b_timeout_end;
+    str_frame.int_reconnect_seconds = str_server->int_reconnect_seconds;
     for (unsigned int int_i = 0; int_i < str_frame.int_ships; ++int_i) {
         unsigned int int_slot = str_frame.arr_ships[int_i].int_player_id - 1;
         str_frame.arr_ships[int_i].int_client_time = str_server->arr_slots[int_slot].int_client_time;

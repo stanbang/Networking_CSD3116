@@ -99,6 +99,10 @@ static void entity_cases(void)
     str_ship.int_invulnerable=AST_INVULNERABLE_TICKS+1; assert(!snapshot_valid(&str_snapshot)); str_ship.int_invulnerable=0;
     str_ship.int_vx=INT16_MAX; assert(!snapshot_valid(&str_snapshot)); str_ship.int_vx=0;
     assert(snapshot_valid(&str_snapshot));
+    str_snapshot.int_reconnect_seconds=30; assert(snapshot_valid(&str_snapshot));
+    str_snapshot.int_reconnect_seconds=31; assert(!snapshot_valid(&str_snapshot));
+    str_snapshot.int_reconnect_seconds=0;
+    puts("PASS reconnect countdown bounded to30seconds");
     puts("PASS malformed bullet/asteroid/health snapshot boundaries");
 }
 
@@ -127,6 +131,12 @@ static void audit_creation_cases(void)
 
 static void account_cases(void)
 {
+    assert(!account_password_valid((const uint8_t *)"abcde", 5));
+    assert(account_password_valid((const uint8_t *)"abcdef", 6));
+    assert(account_password_valid((const uint8_t *)"123456", 6));
+    puts("PASS six-digit password accepted");
+    assert(account_password_valid((const uint8_t *)"abcdefg", 7));
+    puts("PASS password minimum: five rejected, six/seven letters accepted");
     AstAccount_Request str_req = {.int_version = AstAccount_VERSION, .int_operation = AstAccount_LOGIN,
         .int_seq = 1, .arr_client_nonce = {1}, .arr_request_nonce = {2}, .arr_server_epoch = {3},
         .arr_server_challenge = {4}, .int_username_length = 24, .int_password_length = 128};

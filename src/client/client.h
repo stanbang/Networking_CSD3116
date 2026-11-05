@@ -13,6 +13,7 @@ typedef struct Client {
     atomic_uint int_player_id, int_keys;
     atomic_uint int_ping_ms;
     atomic_uint_fast64_t int_latest_tick;
+    atomic_uint_fast64_t int_end_deadline;
     pthread_mutex_t str_mutex;
     Frame arr_frames[AST_FRAME_HISTORY];
     unsigned int int_head, int_frames;
@@ -26,4 +27,5 @@ bool render_run(Client *str_client, uint64_t int_deadline);
 bool client_interrupted(void);
 bool client_frames(Client *str_client, Frame *str_from, Frame *str_to, float *flt_alpha);
 uint16_t client_bot_keys(Client *str_client);
+bool client_round_ended(const Client *str_client);
 #endif
