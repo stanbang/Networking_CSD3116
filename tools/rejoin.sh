@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+## @file rejoin.sh
+# @brief Reopen one client against the existing local server.
+# Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+# Project AI-use disclosure: docs/AI_USAGE.md.
+
 # Reopen one participant against the existing local server. Team/Codex,2026-11-05.
 set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"

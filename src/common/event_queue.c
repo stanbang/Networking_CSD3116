@@ -1,4 +1,10 @@
-/* Event-driven bounded worker wakeups, no DDS I/O in callbacks. Team + AI, 2026-11-04. */
+/**
+ * @file
+ * @brief Coalesces DDS listener notifications and wakes the network worker.
+ *
+ * Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+ * Project AI-use disclosure: docs/AI_USAGE.md.
+ */
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>

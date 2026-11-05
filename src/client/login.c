@@ -1,4 +1,10 @@
-/* Login input validation and an owned one-command mailbox. Team/Codex, 2026-11-05. */
+/**
+ * @file
+ * @brief Login input validation, credential reading and the command mailbox.
+ *
+ * Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+ * Project AI-use disclosure: docs/AI_USAGE.md.
+ */
 #include <errno.h>
 #include <openssl/crypto.h>
 #include <poll.h>

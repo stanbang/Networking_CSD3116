@@ -1,4 +1,10 @@
-/* Session-bound admission on native-secured identity channels. Author: <team>, Codex assistance. Date: 2026-11-03. */
+/**
+ * @file
+ * @brief Secure DDS server transport, slot admission and input validation.
+ *
+ * Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+ * Project AI-use disclosure: docs/AI_USAGE.md.
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <openssl/crypto.h>

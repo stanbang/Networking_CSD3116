@@ -1,4 +1,10 @@
-/* Client account RPCs. Passwords and bearer values never enter UI/log output. Team/Codex, 2026-11-05. */
+/**
+ * @file
+ * @brief Client-side DDS account requests, responses and login state transitions.
+ *
+ * Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+ * Project AI-use disclosure: docs/AI_USAGE.md.
+ */
 #include <inttypes.h>
 #include <openssl/crypto.h>
 #include <stdio.h>

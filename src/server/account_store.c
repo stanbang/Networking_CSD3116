@@ -1,4 +1,10 @@
-/* Private SQLite account and score persistence. Team + AI, 2026-11-05. */
+/**
+ * @file
+ * @brief Private SQLite account, credential, token and score storage.
+ *
+ * Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+ * Project AI-use disclosure: docs/AI_USAGE.md.
+ */
 #include "server/account_store.h"
 
 #include <errno.h>

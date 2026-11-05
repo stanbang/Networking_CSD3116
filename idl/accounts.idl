@@ -1,4 +1,10 @@
-// Bounded account control on certified identity channels. Team + AI, 2026-11-05.
+/**
+ * @file
+ * @brief Bounded DDS account requests and responses for certified client identities.
+ *
+ * Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+ * Project AI-use disclosure: docs/AI_USAGE.md.
+ */
 module AstAccount {
   const unsigned short VERSION = 1;
   const unsigned short HELLO = 1;

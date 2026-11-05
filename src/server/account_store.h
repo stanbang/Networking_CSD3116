@@ -1,4 +1,10 @@
-/* Worker-owned account database and authentication. Team + AI, 2026-11-05. */
+/**
+ * @file
+ * @brief Storage-worker API for accounts, credentials and leaderboard persistence.
+ *
+ * Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+ * Project AI-use disclosure: docs/AI_USAGE.md.
+ */
 #ifndef AST_ACCOUNT_STORE_H
 #define AST_ACCOUNT_STORE_H
 
@@ -43,25 +49,41 @@ typedef struct {
     uint8_t arr_round_key[24], arr_game_session[8];
 } AccountScore;
 
-/* The worker owns the connection and every call after open. Set process umask
- * before creating threads. The absolute data directory must already be private. */
+/**
+ * @brief Open and migrate the SQLite account database inside a private directory.
+ *
+ * The worker owns the connection and every call after open. Set process umask
+ * before creating threads. The absolute data directory must already be private.
+ */
 bool account_store_open(AccountStore *str_store, const char *str_directory);
+/** @brief Close SQLite and release the account store's handles. */
 bool account_store_close(AccountStore *str_store);
 
-/* Username is NUL-terminated. Inputs and grant do not overlap. Grant is zero on
- * failure. Caller wipes the input password and returned grant. */
+/**
+ * @brief Register or authenticate an account and optionally issue a resume token.
+ *
+ * Username is NUL-terminated. Inputs and grant do not overlap. Grant is zero on
+ * failure. Caller wipes the input password and returned grant.
+ */
 StoreResult account_store_auth(AccountStore *str_store, bool b_register,
     unsigned int int_identity, const char *str_username, const uint8_t *arr_password,
     size_t int_password_length, bool b_remember, AccountGrant *str_grant);
+/** @brief Validate and rotate a remembered login token for the certified identity. */
 StoreResult account_store_resume(AccountStore *str_store, unsigned int int_identity,
     const uint8_t arr_token[ACCOUNT_STORE_TOKEN_BYTES], AccountGrant *str_grant);
 
-/* Revoke by authenticated account id or by token possession, never both. */
+/**
+ * @brief Revoke a remembered login grant by account or token.
+ *
+ * Revoke by authenticated account id or by token possession, never both.
+ */
 StoreResult account_store_revoke(AccountStore *str_store, unsigned int int_identity,
     uint64_t int_account_id, const uint8_t *arr_token);
+/** @brief Read the current best scores and the requesting account's record. */
 StoreResult account_store_leaderboard(AccountStore *str_store, uint64_t int_account_id,
     AccountRecord *str_own, AccountRecord arr_rows[ACCOUNT_STORE_LEADERBOARD_MAX],
     size_t *int_count);
+/** @brief Persist a score while retaining the highest score for the account. */
 StoreResult account_store_score(AccountStore *str_store, const AccountScore *str_score);
 
 #endif

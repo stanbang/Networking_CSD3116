@@ -1,4 +1,8 @@
 @echo off
+rem @file ReconnectPlayer1.cmd
+rem @brief Reopen the Player 1 client in the current local session.
+rem Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+rem Project AI-use disclosure: docs/AI_USAGE.md.
 rem Reopen player1 only; leave the existing server and other player running.
 setlocal
 title DDS Asteroids - Reconnect player 1

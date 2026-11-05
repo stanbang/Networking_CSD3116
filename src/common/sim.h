@@ -1,4 +1,10 @@
-/* Pure deterministic fixed-pool Asteroids. Author: <team>/Codex, 2026-11-04. */
+/**
+ * @file
+ * @brief Simulation state, object pools and game update interfaces.
+ *
+ * Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+ * Project AI-use disclosure: docs/AI_USAGE.md.
+ */
 #ifndef AST_SIM_H
 #define AST_SIM_H
 #include <stdbool.h>
@@ -38,10 +44,16 @@ typedef struct {
     uint16_t int_wave, int_wave_delay;
     bool b_gameover;
 } Sim;
+/** @brief Initialize the simulation with a deterministic random seed. */
 void sim_init(Sim *str_sim, uint32_t int_seed);
+/** @brief Activate or remove a player in the specified simulation slot. */
 void sim_connect(Sim *str_sim, unsigned int int_slot, bool b_active);
+/** @brief Advance the simulation by one tick using the supplied player inputs. */
 void sim_tick(Sim *str_sim, const uint16_t arr_keys[AST_PLAYERS]);
+/** @brief Return the collision radius for an asteroid size. */
 float sim_radius(unsigned int int_size);
+/** @brief Wrap a coordinate into the arena extent. */
 float sim_wrap(float flt_value, float flt_extent);
+/** @brief Choose bot input for the given simulation slot. */
 uint16_t sim_hunter_keys(const Sim *str_sim, unsigned int int_slot);
 #endif

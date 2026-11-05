@@ -1,4 +1,10 @@
-/* Reject invalid lengths and ambiguous account messages before dispatch. Team + AI, 2026-11-05. */
+/**
+ * @file
+ * @brief Validates account credentials and DDS account message fields.
+ *
+ * Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+ * Project AI-use disclosure: docs/AI_USAGE.md.
+ */
 #include "common/account_protocol.h"
 
 bool account_zero(const void *ptr_bytes, size_t int_length)

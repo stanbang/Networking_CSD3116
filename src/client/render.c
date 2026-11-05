@@ -1,4 +1,10 @@
-/* Main-thread neon line renderer with delayed interpolation. Author: <team>/Codex, 2026-11-04. */
+/**
+ * @file
+ * @brief GLFW input and OpenGL rendering for gameplay, login and the HUD.
+ *
+ * Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+ * Project AI-use disclosure: docs/AI_USAGE.md.
+ */
 #include <GLFW/glfw3.h>
 #include <math.h>
 #include <inttypes.h>

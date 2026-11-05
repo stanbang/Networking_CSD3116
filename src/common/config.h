@@ -1,4 +1,10 @@
-/* Shared bounds and timing. Author: <team>, Codex assistance. Date: 2026-11-03. */
+/**
+ * @file
+ * @brief Shared game limits, timing constants and protocol settings.
+ *
+ * Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+ * Project AI-use disclosure: docs/AI_USAGE.md.
+ */
 #ifndef AST_CONFIG_H
 #define AST_CONFIG_H
 #define AST_VERSION 4

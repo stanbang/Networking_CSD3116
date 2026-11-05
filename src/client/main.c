@@ -1,4 +1,10 @@
-/* Finite client entry point, headless or GLFW. Author: <team>, Codex assistance. Date: 2026-11-03. */
+/**
+ * @file
+ * @brief Client entry point and lifecycle for graphical and headless sessions.
+ *
+ * Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+ * Project AI-use disclosure: docs/AI_USAGE.md.
+ */
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>

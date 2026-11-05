@@ -1,4 +1,10 @@
-/* Bounded client login mailbox and public UI state. Team/Codex, 2026-11-05. */
+/**
+ * @file
+ * @brief Login commands, public UI state and the client login mailbox API.
+ *
+ * Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+ * Project AI-use disclosure: docs/AI_USAGE.md.
+ */
 #ifndef AST_CLIENT_LOGIN_H
 #define AST_CLIENT_LOGIN_H
 #include "common/protocol.h"
@@ -27,10 +33,16 @@ typedef struct {
 } LoginView;
 
 struct Client;
+/** @brief Check the operation and credential fields of a login command. */
 bool login_command_valid(const LoginCommand *str_command);
+/** @brief Copy a command into the client login mailbox. */
 bool login_submit(struct Client *str_client, const LoginCommand *str_command);
+/** @brief Consume the pending login command if one is available. */
 bool login_take(struct Client *str_client, LoginCommand *str_command);
+/** @brief Read headless account credentials from the supplied file descriptor. */
 bool login_read_credentials(struct Client *str_client, int int_fd);
+/** @brief Copy the public login state for rendering. */
 void login_view(struct Client *str_client, LoginView *str_view);
+/** @brief Return the display string for an account status code. */
 const char *login_status_text(uint16_t int_status);
 #endif

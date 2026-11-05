@@ -1,4 +1,10 @@
-/* Bounded delayed snapshot handoff. Author: <team>/Codex, 2026-11-04. */
+/**
+ * @file
+ * @brief Snapshot interpolation and bot input based on the latest game state.
+ *
+ * Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+ * Project AI-use disclosure: docs/AI_USAGE.md.
+ */
 #include <string.h>
 #include "client/client.h"
 

@@ -1,4 +1,10 @@
-/* Wire validation, clocks and locks. Author: <team>, Codex assistance. Date: 2026-11-03. */
+/**
+ * @file
+ * @brief Gameplay message validation, monotonic timing and synchronization helpers.
+ *
+ * Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+ * Project AI-use disclosure: docs/AI_USAGE.md.
+ */
 #include <errno.h>
 #include <limits.h>
 #include <stdio.h>

@@ -1,4 +1,10 @@
-/* Pure authoritative60Hz physics; no I/O/allocation/locks. Author: <team>/Codex, 2026-11-04. */
+/**
+ * @file
+ * @brief Deterministic fixed-tick game simulation with fixed-size object pools.
+ *
+ * Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+ * Project AI-use disclosure: docs/AI_USAGE.md.
+ */
 #include <math.h>
 #include <string.h>
 #include "common/sim.h"

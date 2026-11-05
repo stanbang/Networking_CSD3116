@@ -1,4 +1,10 @@
-/* Nonce-addressed finite networking on native-secured identity channels. Author: <team>, Codex assistance. Date: 2026-11-03. */
+/**
+ * @file
+ * @brief Secure DDS client transport, session admission and snapshot processing.
+ *
+ * Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+ * Project AI-use disclosure: docs/AI_USAGE.md.
+ */
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,4 +1,10 @@
-/* Bounded account flow and single SQLite/KDF owner. Team + Codex, 2026-11-05. */
+/**
+ * @file
+ * @brief Server account flows and asynchronous SQLite and password verification work.
+ *
+ * Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+ * Project AI-use disclosure: docs/AI_USAGE.md.
+ */
 #include <limits.h>
 #include <openssl/crypto.h>
 #include <openssl/hmac.h>

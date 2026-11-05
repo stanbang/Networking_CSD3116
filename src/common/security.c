@@ -1,4 +1,10 @@
-/* Native PKI-DH, signed policies and AES-GCM. Author: <team>, Codex assistance. Date: 2026-11-03. */
+/**
+ * @file
+ * @brief Configures native DDS authentication, signed permissions and encryption.
+ *
+ * Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+ * Project AI-use disclosure: docs/AI_USAGE.md.
+ */
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,4 +1,10 @@
-/* Atomic Linux-home profiles store a resume token, never a password. Team/Codex, 2026-11-05. */
+/**
+ * @file
+ * @brief Private, atomically updated storage for remembered login tokens.
+ *
+ * Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+ * Project AI-use disclosure: docs/AI_USAGE.md.
+ */
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>

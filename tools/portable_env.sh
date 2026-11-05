@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+## @file portable_env.sh
+# @brief Set library and executable paths for the bundled Ubuntu SDK.
+# Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+# Project AI-use disclosure: docs/AI_USAGE.md.
+
 # Local Ubuntu24.04 x86-64 SDK environment. Team/Codex2026-11-05.
 SDK="$ROOT/portable/linux-x86_64"
 [[ $(uname -m) == x86_64 ]] || { echo 'This ZIP targets x86_64 Ubuntu24.04 under WSL.' >&2; return 1; }

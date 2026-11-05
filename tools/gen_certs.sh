@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+## @file gen_certs.sh
+# @brief Generate private DDS credentials and signed policies for local play.
+# Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+# Project AI-use disclosure: docs/AI_USAGE.md.
+
 # Private runtime CA/identity/policy material. Author: <team>/Codex, 2026-11-03.
 # Usage: bash tools/gen_certs.sh [NEW_PRIVATE_LINUX_DIRECTORY]
 # No key contents are printed. Never place this output in a source archive.

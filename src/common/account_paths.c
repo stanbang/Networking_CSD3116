@@ -1,4 +1,10 @@
-/* Derive stable state scope from the trusted CA and open owned directories. Team + AI, 2026-11-05. */
+/**
+ * @file
+ * @brief Derives account storage scopes from the trusted CA and validates private directories.
+ *
+ * Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+ * Project AI-use disclosure: docs/AI_USAGE.md.
+ */
 #include "common/account_paths.h"
 #include <errno.h>
 #include <fcntl.h>

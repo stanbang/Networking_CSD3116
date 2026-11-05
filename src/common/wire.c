@@ -1,6 +1,12 @@
-/* Prevent native XCDR1 fast-copy from transmitting C padding. Team + AI, 2026-11-04.
- * A member initializer need not define padding; clearing it at the final typed
- * boundary preserves every protocol field, fault injection, QoS and wire layout. */
+/**
+ * @file
+ * @brief Writes typed DDS samples after clearing C structure padding.
+ * @details Member initialization can leave padding undefined. Clearing it at
+ * the DDS write boundary preserves protocol fields, fault injection and QoS.
+ *
+ * Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+ * Project AI-use disclosure: docs/AI_USAGE.md.
+ */
 #include <stdbool.h>
 #include "common/config.h"
 #include "common/wire.h"

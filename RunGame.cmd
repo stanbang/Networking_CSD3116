@@ -1,4 +1,8 @@
 @echo off
+rem @file RunGame.cmd
+rem @brief Build and launch the local game in the default WSL distribution.
+rem Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+rem Project AI-use disclosure: docs/AI_USAGE.md.
 rem Start DDS Asteroids in the default Ubuntu WSL distribution. setlocal
 title DDS Asteroids
 where wsl.exe >nul 2>nul

@@ -1,4 +1,10 @@
-/* P1 lease/admission state, no game sim yet. Author: <team>, Codex assistance. Date: 2026-11-03. */
+/**
+ * @file
+ * @brief Server simulation state, authenticated slots and reconnect lifecycle interfaces.
+ *
+ * Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+ * Project AI-use disclosure: docs/AI_USAGE.md.
+ */
 #ifndef AST_SERVER_H
 #define AST_SERVER_H
 #include "common/protocol.h"
@@ -43,8 +49,14 @@ typedef struct {
     uint64_t int_snapshots;
     bool b_test_prepared;
 } Server;
+/** @brief Run the server DDS worker and publish authoritative game snapshots. */
 void *server_worker(void *ptr_server);
+/** @brief Check input leases and advance the reconnect timeout state. */
 void server_expire(Server *str_server, uint64_t int_now);
-/* Caller holds the game mutex. The account worker never takes it. */
+/**
+ * @brief Mark a player as disconnected and reserve the ship for reconnect.
+ *
+ * Caller holds the game mutex. The account worker never takes it.
+ */
 void server_release_slot(Server *str_server, unsigned int int_slot);
 #endif

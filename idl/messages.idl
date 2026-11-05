@@ -1,4 +1,10 @@
-// Bounded v2 wire types. Author: <team>, Codex assistance. Date: 2026-11-03.
+/**
+ * @file
+ * @brief Bounded DDS wire types for match admission, player input and snapshots.
+ *
+ * Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+ * Project AI-use disclosure: docs/AI_USAGE.md.
+ */
 module Ast {
   @final struct Join {
     unsigned short int_version;

@@ -1,4 +1,10 @@
-/* Strict finite CLI parsing. Author: <team>, Codex assistance. Date: 2026-11-03. */
+/**
+ * @file
+ * @brief Parses and validates command-line options for the server and client.
+ *
+ * Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+ * Project AI-use disclosure: docs/AI_USAGE.md.
+ */
 #include <errno.h>
 #include <math.h>
 #include <limits.h>

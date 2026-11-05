@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+## @file build_portable.sh
+# @brief Build the server and client using host GCC and the bundled SDK.
+# Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+# Project AI-use disclosure: docs/AI_USAGE.md.
+
 # Offline source build: host GCC, bundled headers/libs/generated DDS. No apt/make/idlc/pkg-config.
 set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"

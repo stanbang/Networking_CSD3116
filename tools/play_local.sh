@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+## @file play_local.sh
+# @brief Launch a local server and two client processes, then manage their lifetime.
+# Team contribution split: Stanley Lur 50%, Jordain Ng 50%.
+# Project AI-use disclosure: docs/AI_USAGE.md.
+
 # Start a secure two-window local game. Author: <team>/Codex, 2026-11-04.
 # Run inside Ubuntu: bash tools/play_local.sh [--headless] [--duration SECONDS]
 # A full local provisioning fixture stays in private Linux storage, never the repo.
