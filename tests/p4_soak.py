@@ -8,6 +8,7 @@ import argparse
 from pathlib import Path
 import random
 import re
+import shlex
 import signal
 import subprocess
 import sys
@@ -15,23 +16,27 @@ import time
 sys.dont_write_bytecode=True
 from p1_network import stop,wait_line
 from verify_audit import verify
+from account_fixture import AccountFixture
 
 
 class Soak:
     """Own all logs/processes, and require real successful joins and shutdowns."""
     def __init__(self,args):
-        self.args=args;self.out=Path("build/p4-"+Path(args.bin_dir).name+"-soak")
-        self.out.mkdir(parents=True,exist_ok=True)
+        self.args=args
+        self.accounts = AccountFixture()
+        self.out=args.output_dir or Path("build/p4-"+Path(args.bin_dir).name+"-soak")
+        self.out.mkdir(parents=True,exist_ok=False)
         self.children=[];self.streams=[];self.logs=[];self.sessions=[0]*5
 
     def start(self,name,kind,extra):
         """Keep sanitizer stderr with per-process stdout for independent inspection."""
-        path=self.out/(name+".log"); stream=path.open("w")
+        path=self.out/(name+".log"); stream=path.open("x")
         self.streams.append(stream);self.logs.append(path)
         command=[str(Path(self.args.bin_dir).resolve()/kind),"--security-dir",self.args.security_dir,*extra]
         if self.args.setarch:
             command=["setarch","x86_64","-R",*command]
-        process=subprocess.Popen(command,stdout=stream,stderr=subprocess.STDOUT)
+        print("COMMAND",shlex.join(command),flush=True)
+        process=self.accounts.spawn(command,stdout=stream,stderr=subprocess.STDOUT)
         self.children.append(process)
         return process,path
 
@@ -75,26 +80,37 @@ def churn(run,server,clients):
     return elapsed,events,kills,graceful
 
 
-def inspect(run,server_log,audit,elapsed,events,kills,graceful):
-    """Scan all process logs, inspect live effects and anchor the audit hash chain."""
+def inspect_logs(run):
+    """Review every retained log after cleanup, even when workload assertions fail."""
     failures=[]
     for path in run.logs:
-        text=path.read_text(errors="replace")
-        if re.search(r"ERROR: (?:AddressSanitizer|LeakSanitizer)|AddressSanitizer:DEADLYSIGNAL|runtime error:|WARNING: ThreadSanitizer|FATAL: ThreadSanitizer",text):
+        try:
+            text=path.read_text(errors="replace")
+        except OSError as error:
+            print("LOG_REVIEW",path,"unreadable",str(error),flush=True)
             failures.append(str(path))
-    assert not failures,f"Sanitizer diagnostic logs: {failures}"
+            continue
+        diagnostics=re.findall(r"^.*(?:ERROR: (?:AddressSanitizer|LeakSanitizer)|AddressSanitizer:DEADLYSIGNAL|runtime error:|WARNING: ThreadSanitizer|FATAL: ThreadSanitizer).*$",text,re.MULTILINE)
+        print("LOG_REVIEW",path,f"sanitizer_diagnostics={len(diagnostics)}",flush=True)
+        if diagnostics:failures.append(str(path))
+    return failures
+
+
+def inspect(run,server_log,audit,elapsed,events,kills,graceful):
+    """Inspect real gameplay effects and anchor the completed audit hash chain."""
     text=server_log.read_text();summary=re.search(r"SERVER_SUMMARY ([^\n]+)",text)
     assert summary
     counts={key:int(value) for key,value in re.findall(r"(\w+)=(\d+)",summary.group(1))}
     assert counts["joins"]==5+events and counts["peak"]==5,counts
-    assert counts["timeouts"]>=kills and counts["leaves"]>=graceful+5,counts
+    # Every departure is controlled: extra timeouts/invalid sessions would mean
+    # a legitimate client silently stopped participating despite staying alive.
+    assert counts["timeouts"]==kills and counts["leaves"]==graceful+5,counts
+    assert counts["invalid"]==0 and counts["stale"]==0,counts
     assert counts["ticks"]>=run.args.duration*30,counts
     for key in ("moves","shots","destroyed","snapshots"):assert counts[key]>0,counts
     root=re.search(r"AUDIT_ROOT hash=([0-9a-f]{64}) records=(\d+)",text);assert root
     verify(audit,root.group(1),int(root.group(2)))
     print("SERVER_SUMMARY",summary.group(1),flush=True)
-    print(f"PASS secure soak elapsed={elapsed:.1f}s churn={events} kills={kills} graceful={graceful} logs={len(run.logs)}",flush=True)
-    print("PASS no sanitizer diagnostics in owned process logs; final audit verified",flush=True)
 
 
 def main():
@@ -102,6 +118,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--security-dir",required=True);parser.add_argument("--bin-dir",default="build/asan")
     parser.add_argument("--duration",type=int,default=120);parser.add_argument("--seed",type=int,default=3116)
+    parser.add_argument("--output-dir",type=Path,help="New evidence directory; existing output is never overwritten")
     parser.add_argument("--setarch",action="store_true",help="Disable ASLR only for these test processes (TSan mapping workaround)")
     args=parser.parse_args();assert 120<=args.duration<=600
     run=Soak(args);audit=(run.out/"audit.log").resolve()
@@ -109,8 +126,17 @@ def main():
         server,log=run.start("server","server",["--duration",str(args.duration+40),"--audit-file",str(audit)])
         wait_line(log,r"SERVER_READY security=NATIVE_DDS",server,timeout=12)
         clients=[run.client(identity) for identity in range(1,6)]
-        inspect(run,log,audit,*churn(run,server,clients))
-    finally:run.cleanup()
+        result=churn(run,server,clients)
+        inspect(run,log,audit,*result)
+    finally:
+        run.cleanup()
+        failures=inspect_logs(run)
+        if failures:
+            print("FAIL sanitizer diagnostic or unreadable logs:",failures,file=sys.stderr,flush=True)
+            if sys.exc_info()[0] is None:raise AssertionError(f"Sanitizer diagnostic logs: {failures}")
+    elapsed,events,kills,graceful=result
+    print(f"PASS secure soak elapsed={elapsed:.1f}s churn={events} kills={kills} graceful={graceful} logs={len(run.logs)}",flush=True)
+    print("PASS no sanitizer diagnostics in owned process logs; final audit verified",flush=True)
 
 
 if __name__=="__main__":main()

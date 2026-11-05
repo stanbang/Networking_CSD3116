@@ -48,5 +48,13 @@ Thumbs.db
 
 # Local packet evidence and Python caches.
 *.pcap
+*.pcapng
 __pycache__/
 *.py[cod]
+
+# Account data and private client profiles
+*.sqlite3
+*.sqlite3-*
+*.profile
+l[1-6]-*.lock
+accounts.lock

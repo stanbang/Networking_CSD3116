@@ -4,7 +4,7 @@ set -euo pipefail
 
 sudo apt update
 sudo apt install -y build-essential pkg-config git gdb valgrind \
-  openssl libssl-dev \
+  openssl libssl-dev libsqlite3-dev \
   libgl1-mesa-dev libglfw3-dev \
   cyclonedds-dev cyclonedds-tools
 
@@ -13,6 +13,7 @@ command -v gcc >/dev/null && gcc --version | head -1
 command -v idlc >/dev/null && echo "idlc: OK" || echo "idlc: MISSING (needed to generate messages.c/h)"
 echo "CycloneDDS: $(pkg-config --modversion CycloneDDS 2>/dev/null || echo MISSING)"
 echo "GLFW:       $(pkg-config --modversion glfw3 2>/dev/null || echo MISSING)"
+echo "SQLite:     $(pkg-config --modversion sqlite3 2>/dev/null || echo MISSING)"
 openssl version
 
 echo; echo "=== DDS Security plugins (needed for the preferred security design) ==="

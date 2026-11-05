@@ -2,6 +2,8 @@
 
 CSD3116 team with Codex assistance, 5 November 2026. This guide is for Stanley's current Windows/Ubuntu WSL checkout. Commands below are for **Ubuntu**, not PowerShell, unless labelled otherwise. Test one local session at a time. Current DDS configuration is domain42 on loopback, so this is not a two-computer test.
 
+The account build needs `libsqlite3-dev` and a newly signed bundle with the account topics. Pick a fresh bundle suffix below if the earlier bundle predates the account work. After opening each player window, register a distinct account with Shift+Enter or sign in with Enter. See [account controls and storage paths](../README.md#quick-start-on-this-windows-machine).
+
 ## What changed and what actually passed
 
 The contributor's complete Asteroids implementation was preserved and integrated, rather than rewritten. Earlier local work repaired the observed GUI state/lease regression using bounded reader notifications, made audit files refuse overwrite/symlink targets, strengthened lifecycle/GUI checks and added scoped play/stop tools. Native DDS Security, IDL and gameplay remain in place.
@@ -152,7 +154,7 @@ python3 - <<'PY'
 import subprocess
 from pathlib import PurePosixPath
 paths=subprocess.check_output(['git','ls-tree','-r','--name-only','HEAD'],text=True).splitlines()
-forbidden=[p for p in paths if PurePosixPath(p).suffix.lower() in {'.key','.pem','.pcap'} or PurePosixPath(p).parts[0] in {'build','credentials','secrets'}]
+forbidden=[p for p in paths if PurePosixPath(p).suffix.lower() in {'.key','.pem','.p12','.pcap','.pcapng','.profile'} or '.sqlite3' in PurePosixPath(p).name.lower() or PurePosixPath(p).name == 'accounts.lock' or PurePosixPath(p).parts[0] in {'build','credentials','secrets'}]
 if forbidden:
     raise SystemExit('STOP: excluded files in commit: '+', '.join(forbidden))
 print('PASS committed filename exclusions; still review source for embedded secrets')

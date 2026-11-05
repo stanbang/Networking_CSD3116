@@ -43,6 +43,16 @@ Certificate lifetimes should be short (the starter workflow uses 30 days). Renew
 
 The current P1 admission history keeps at most 64 retired nonces per provisioned identity and fails closed after exhaustion. This bounds memory but limits reconnect availability until server restart; record the MEDIUM limitation rather than describing unlimited reconnection. Native security must not silently downgrade if plugins, credentials or policy files are absent. Bounded application queues cannot prevent link saturation, expensive unauthenticated handshake floods, or denial of service by the host/network administrator.
 
+## Accounts, scores and remembered login
+
+Native DDS authenticates the provisioned identity and protects its exact AccountRequest and AccountResponse topics. The server derives identity from the reader channel. A fresh challenge and boot epoch bind account messages to that connection. Join also requires its authenticated account nonce. Each provisioned identity is one security principal. Sharing a certificate exposes that identity's account channel to each holder. Game snapshots retain certificate-level visibility.
+
+The sole storage worker runs OpenSSL scrypt with per-account random salts and checks one password at a time. Per-identity and global request budgets bound password checks. The server uses fixed per-identity request, reply and score slots. SQLite writes occur in private Linux storage. Scores come from server simulation, and the transactional maximum keeps the best committed result and its provenance. An abrupt server loss can lose the current uncommitted score.
+
+Remember Me issues a random 32-byte token with a seven-day expiry. SQLite stores its SHA-256 digest. Resume requires the bound certificate identity and rotates the token transactionally. Logout and online Forget revoke the token. An offline Forget removes the local profile and reports that server revocation is unconfirmed. The client stores the token in a private, locked profile. A compromised OS user can access its runtime files.
+
+See [the account protocol and storage design](ACCOUNT_FEATURE_DESIGN.md) and [the actual account test results](TEST_REPORT.md).
+
 ## Accountability and non-repudiation
 
 Audit accepted joins, rejected requests, authentication/authorization diagnostics and rate limits with timestamp and identity information actually available at that layer. A failed handshake may provide no trustworthy identity; label it unknown rather than copying an untrusted claimed identity. Keep middleware diagnostics separate where no app sample was delivered.

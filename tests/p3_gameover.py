@@ -20,8 +20,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--security-dir", required=True)
     parser.add_argument("--bin-dir", default="build/release")
+    parser.add_argument("--output-dir", type=Path, default=Path("build/p3-gameover"))
     args = parser.parse_args()
-    run = Run(Path(args.bin_dir).resolve(), args.security_dir, Path("build/p3-gameover"))
+    run = Run(Path(args.bin_dir).resolve(), args.security_dir, args.output_dir)
     audit = (run.out/"audit.log").resolve()
     try:
         server, log = run.start("server", "server", ["--duration", "15", "--test-scenario", "gameover",

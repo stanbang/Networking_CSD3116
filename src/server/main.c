@@ -3,11 +3,45 @@
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
+#include "common/account_paths.h"
 #include "server/server.h"
 static volatile sig_atomic_t b_signal = 0;
 
 /* Signal handlers touch only sig_atomic_t state. */
 static void stop_signal(int int_signal) { (void)int_signal; b_signal = 1; }
+
+/* Provenance stays with the simulated ship even when its slot is reused. */
+static void capture_score(Server *str_server, unsigned int int_slot)
+{
+    const ScoreOwner *str_owner = &str_server->arr_score_owner[int_slot];
+    if (!str_owner->int_account_id) return;
+    AccountScore str_score = {.int_account_id = str_owner->int_account_id,
+        .int_score = str_server->str_sim.arr_ships[int_slot].int_score};
+    if (!str_score.int_score) return;
+    memcpy(str_score.arr_round_key, str_server->arr_boot_id, sizeof(str_server->arr_boot_id));
+    for (unsigned int int_i = 0; int_i < 8; ++int_i) {
+        str_score.arr_round_key[16 + int_i] = (uint8_t)(str_server->int_round >> (56 - 8 * int_i));
+        str_score.arr_game_session[int_i] = (uint8_t)(str_owner->int_session >> (56 - 8 * int_i));
+    }
+    if (!accounts_submit_score(str_server->ptr_accounts, str_owner->int_identity, &str_score)) {
+        atomic_store(&str_server->b_failed, true);
+        atomic_store(&str_server->b_stop, true);
+    }
+}
+
+static void capture_scores(Server *str_server)
+{
+    for (unsigned int int_i = 0; int_i < AST_PLAYERS; ++int_i) capture_score(str_server, int_i);
+}
+
+void server_release_slot(Server *str_server, unsigned int int_slot)
+{
+    Slot *str_slot = &str_server->arr_slots[int_slot];
+    capture_score(str_server, int_slot);
+    accounts_game_left(str_server->ptr_accounts, str_slot->int_identity, str_slot->arr_nonce);
+    *str_slot = (Slot){0};
+}
 
 /* Explicit local acceptance fixture, never enabled by a network message.
  * Set up real collisions once; only sim_tick may increment evidence counters. */
@@ -35,23 +69,31 @@ static bool prepare_gameover_test(Server *str_server)
 static void game_step(Server *str_server)
 {
     uint16_t arr_keys[AST_PLAYERS] = {0};
+    bool b_restart_requested = false;
     mutex_lock(&str_server->str_mutex);
     for (unsigned int int_i = 0; int_i < AST_PLAYERS; ++int_i) {
         const Slot *str_slot = &str_server->arr_slots[int_i];
         uint64_t int_session = str_slot->b_active ? str_slot->int_session : 0;
         if (str_server->arr_sim_session[int_i] != int_session) {
+            capture_score(str_server, int_i);
             sim_connect(&str_server->str_sim, int_i, false);
             sim_connect(&str_server->str_sim, int_i, str_slot->b_active);
             str_server->arr_sim_session[int_i] = int_session;
+            str_server->arr_score_owner[int_i] = (ScoreOwner){.int_account_id = str_slot->int_account_id,
+                .int_session = int_session, .int_identity = str_slot->int_identity};
         }
         arr_keys[int_i] = str_slot->b_active ? str_slot->int_keys : 0;
+        b_restart_requested |= (arr_keys[int_i] & AST_KEY_RESTART) != 0;
     }
     bool b_fixture=prepare_gameover_test(str_server);
     uint64_t int_over_before=str_server->str_sim.str_counts.int_gameovers;
     uint64_t int_restart_before=str_server->str_sim.str_counts.int_restarts;
+    if (str_server->str_sim.b_gameover && b_restart_requested) capture_scores(str_server);
     sim_tick(&str_server->str_sim, arr_keys);
     bool b_over=str_server->str_sim.str_counts.int_gameovers!=int_over_before;
     bool b_restart=str_server->str_sim.str_counts.int_restarts!=int_restart_before;
+    if (b_over) capture_scores(str_server);
+    if (b_restart) ++str_server->int_round;
     uint64_t int_tick=str_server->str_sim.int_tick;
     mutex_unlock(&str_server->str_mutex);
     if(b_fixture) printf("SERVER_TEST_SCENARIO name=gameover tick=%" PRIu64 "\n",int_tick);
@@ -69,7 +111,7 @@ void server_expire(Server *str_server, uint64_t int_now)
         Slot *str_slot = &str_server->arr_slots[int_i];
         if (str_slot->b_active && lease_expired(int_now, str_slot->int_seen)) {
             arr_expired[int_i] = str_slot->int_identity;
-            *str_slot = (Slot){0};
+            server_release_slot(str_server, int_i);
             ++str_server->int_timeouts;
         }
     }
@@ -108,15 +150,32 @@ int main(int int_argc, char **arr_argv)
     setvbuf(stdout, NULL, _IOLBF, 0);
     if (!options_parse(int_argc, arr_argv, &str_options, true)) { fprintf(stderr, "Invalid server options\n"); return 2; }
     if (signal(SIGINT, stop_signal) == SIG_ERR || signal(SIGTERM, stop_signal) == SIG_ERR) return 1;
+    umask(0077);
+    char arr_default_dir[PATH_MAX];
+    if (!str_options.str_account_dir) {
+        if (!account_private_dir(str_options.str_security_dir, "server", arr_default_dir)) {
+            fputs("ACCOUNT_STORAGE_ERROR private directory unavailable\n", stderr);
+            return 1;
+        }
+        str_options.str_account_dir = arr_default_dir;
+    }
+    if (!random_bytes(str_server.arr_boot_id, sizeof(str_server.arr_boot_id))) return 1;
     str_server.str_options = str_options;
     sim_init(&str_server.str_sim, UINT32_C(0xC5D3116));
     if (!audit_open(&str_server.str_audit, str_options.str_audit_file)) { fprintf(stderr, "audit_open failed\n"); return 1; }
     audit_event(&str_server.str_audit, 0, "START", "startup");
     if (atomic_load(&str_server.str_audit.b_failed)) { audit_close(&str_server.str_audit); return 1; }
+    str_server.ptr_accounts = accounts_create(str_options.str_account_dir, &str_server.str_audit);
+    if (!str_server.ptr_accounts) {
+        fputs("ACCOUNT_STORAGE_ERROR startup failed\n", stderr);
+        audit_close(&str_server.str_audit);
+        return 1;
+    }
     audit_dds_install(&str_server.str_audit);
     int int_result = pthread_create(&str_thread, NULL, server_worker, &str_server);
     if (int_result) {
         fprintf(stderr, "pthread_create: %s\n", strerror(int_result));
+        accounts_destroy(str_server.ptr_accounts);
         audit_dds_uninstall(); audit_close(&str_server.str_audit); return 1;
     }
     while (!atomic_load(&str_server.b_ready) && !atomic_load(&str_server.b_stop) && !b_signal) sleep_ns(1000000);
@@ -133,9 +192,11 @@ int main(int int_argc, char **arr_argv)
     atomic_store(&str_server.b_stop, true);
     int_result = pthread_join(str_thread, NULL);
     if (int_result) { fprintf(stderr, "pthread_join: %s\n", strerror(int_result)); return 1; }
+    capture_scores(&str_server);
+    bool b_accounts_ok = accounts_destroy(str_server.ptr_accounts);
     summary(&str_server);
     audit_dds_uninstall();
     bool b_audit_ok = audit_close(&str_server.str_audit);
     int_result = pthread_mutex_destroy(&str_server.str_mutex);
-    return int_result || !b_audit_ok || atomic_load(&str_server.b_failed) ? 1 : 0;
+    return int_result || !b_audit_ok || !b_accounts_ok || atomic_load(&str_server.b_failed) ? 1 : 0;
 }

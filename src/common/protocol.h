@@ -15,6 +15,9 @@ typedef struct {
     const char *str_bot, *str_fault;
     const char *str_security_dir, *str_audit_file;
     bool b_test_gameover;
+    const char *str_account_dir, *str_profile_dir, *str_account_action;
+    int int_credentials_fd;
+    bool b_register, b_remember, b_account_only;
 } Options;
 bool options_parse(int int_argc, char **arr_argv, Options *str_options, bool b_server);
 bool join_valid(const Ast_Join *str_join);

@@ -1,16 +1,19 @@
 /* Session-bound admission on native-secured identity channels. Author: <team>, Codex assistance. Date: 2026-11-03. */
 #include <stdio.h>
 #include <stdlib.h>
+#include <openssl/crypto.h>
 #include "common/event_queue.h"
 #include <string.h>
 #include "server/server.h"
 #include "common/security.h"
+#include "common/wire.h"
 typedef struct {
     dds_entity_t int_participant;
     EventQueue str_events;
-    EventReader arr_events[AST_EVENT_CHANNELS];
+    EventReader arr_events[AST_DDS_READERS];
     dds_entity_t arr_join[AST_IDENTITIES], arr_input[AST_IDENTITIES], arr_leave[AST_IDENTITIES];
     dds_entity_t arr_response[AST_IDENTITIES];
+    dds_entity_t arr_account_request[AST_IDENTITIES], arr_account_response[AST_IDENTITIES];
     uint64_t int_response_seq;
     dds_entity_t int_snapshot;
     uint64_t int_snapshot_seq, int_last_snapshot;
@@ -37,7 +40,8 @@ static bool nonce_available(const Server *str_server, unsigned int int_identity,
 }
 
 /* Called locked. At most five slots are searched; no random placement loop. */
-static int allocate_slot(Server *str_server, unsigned int int_identity, const Ast_Join *str_join, uint64_t int_session)
+static int allocate_slot(Server *str_server, unsigned int int_identity, const Ast_Join *str_join,
+                         uint64_t int_session, uint64_t int_account_id)
 {
     int int_slot = -1;
     unsigned int int_active = 0;
@@ -45,10 +49,11 @@ static int allocate_slot(Server *str_server, unsigned int int_identity, const As
         if (str_server->arr_slots[int_i].b_active) ++int_active;
         else if (int_slot == -1) int_slot = int_i;
     }
-    if (int_slot < 0) return -1;
+    if (int_slot < 0 || !accounts_game_joined(str_server->ptr_accounts, int_identity,
+            str_join->arr_nonce, int_account_id)) return -1;
     Slot *str_slot = &str_server->arr_slots[int_slot];
     *str_slot = (Slot){.b_active = true, .int_identity = int_identity,
-        .int_session = int_session, .int_seen = monotonic_ns()};
+        .int_session = int_session, .int_seen = monotonic_ns(), .int_account_id = int_account_id};
     memcpy(str_slot->arr_nonce, str_join->arr_nonce, 16);
     unsigned int int_nonce_index = str_server->arr_nonce_count[int_identity - 1]++;
     memcpy(str_server->arr_used_nonce[int_identity - 1][int_nonce_index], str_join->arr_nonce, 16);
@@ -62,10 +67,12 @@ static void admit(Server *str_server, unsigned int int_identity, const Ast_Join 
                   uint64_t int_session, Ast_Response *str_response)
 {
     mutex_lock(&str_server->str_mutex);
-    int int_slot = find_identity(str_server, int_identity);
+    uint64_t int_account_id = 0;
+    int int_slot = accounts_authorize_join(str_server->ptr_accounts, int_identity, str_join->arr_nonce,
+        &int_account_id) ? find_identity(str_server, int_identity) : -2;
     if (int_slot >= 0 && memcmp(str_server->arr_slots[int_slot].arr_nonce, str_join->arr_nonce, 16) != 0) int_slot = -2;
     if (int_slot == -1) int_slot = nonce_available(str_server, int_identity, str_join->arr_nonce) ?
-        allocate_slot(str_server, int_identity, str_join, int_session) : -2;
+        allocate_slot(str_server, int_identity, str_join, int_session, int_account_id) : -2;
     if (int_slot >= 0) {
         str_response->int_player_id = (uint16_t)(int_slot + 1);
         str_response->int_session = str_server->arr_slots[int_slot].int_session;
@@ -90,7 +97,7 @@ static bool join_message(Server *str_server, Network *str_net, unsigned int int_
     audit_event(&str_server->str_audit, int_channel + 1, str_response.int_status ? "REJECT" : "JOIN", "admission");
     printf("SERVER_JOIN identity=%u id=%u status=%s\n", int_channel + 1, str_response.int_player_id,
            str_response.int_status ? "rejected" : "accepted");
-    dds_return_t int_result = dds_write(str_net->arr_response[int_channel], &str_response);
+    dds_return_t int_result = wire_write_response(str_net->arr_response[int_channel], &str_response);
     if (int_result == DDS_RETCODE_TIMEOUT) {
         mutex_lock(&str_server->str_mutex); ++str_server->int_rate_hits; mutex_unlock(&str_server->str_mutex);
         printf("SERVER_BACKPRESSURE identity=%u kind=response\n", int_channel + 1);
@@ -147,11 +154,62 @@ static void leave_message(Server *str_server, unsigned int int_identity, const A
     if (!str_reason) str_reason = session_check(str_server, int_identity, str_leave->int_player_id,
                                                str_leave->int_session, str_leave->int_seq);
     if (str_reason) ++str_server->int_invalid;
-    else { str_server->arr_slots[str_leave->int_player_id - 1] = (Slot){0}; ++str_server->int_leaves; }
+    else { server_release_slot(str_server, str_leave->int_player_id - 1); ++str_server->int_leaves; }
     mutex_unlock(&str_server->str_mutex);
     if (str_reason) printf("SERVER_DROP identity=%u reason=%s\n", int_identity, str_reason);
     else printf("SERVER_LEAVE identity=%u id=%u\n", int_identity, str_leave->int_player_id);
     audit_event(&str_server->str_audit, int_identity, str_reason ? "DROP" : "LEAVE", str_reason ? str_reason : "explicit");
+}
+
+/* A validated account close releases only its own admitted game. */
+static void account_release_game(Server *str_server, unsigned int int_identity, const uint8_t arr_nonce[16])
+{
+    mutex_lock(&str_server->str_mutex);
+    int int_slot = find_identity(str_server, int_identity);
+    bool b_released = int_slot >= 0 && memcmp(str_server->arr_slots[int_slot].arr_nonce, arr_nonce, 16) == 0;
+    if (b_released) {
+        server_release_slot(str_server, (unsigned int)int_slot);
+        ++str_server->int_leaves;
+    }
+    mutex_unlock(&str_server->str_mutex);
+    if (b_released) {
+        printf("SERVER_LEAVE identity=%u id=%d\n", int_identity, int_slot + 1);
+        audit_event(&str_server->str_audit, int_identity, "LEAVE", "explicit");
+    }
+}
+
+static bool drain_account(Server *str_server, Network *str_net, unsigned int int_channel)
+{
+    dds_entity_t int_reader = str_net->arr_account_request[int_channel];
+    void *arr_samples[AST_BATCH] = {0};
+    dds_sample_info_t arr_info[AST_BATCH] = {0};
+    dds_return_t int_count = dds_take(int_reader, arr_samples, arr_info, AST_BATCH, AST_BATCH);
+    if (!dds_ok(int_count, "account_take")) return false;
+    bool b_ok = true;
+    for (dds_return_t int_i = 0; int_i < int_count && b_ok; ++int_i) {
+        if (!arr_info[int_i].valid_data) continue;
+        const AstAccount_Request *str_request = arr_samples[int_i];
+        bool b_release = false;
+        b_ok = accounts_receive(str_server->ptr_accounts, int_channel + 1, str_request, &b_release);
+        if (b_ok && b_release) account_release_game(str_server, int_channel + 1, str_request->arr_client_nonce);
+    }
+    if (int_count && !dds_ok(dds_return_loan(int_reader, arr_samples, int_count), "account_return_loan")) b_ok = false;
+    return b_ok && (int_count != AST_BATCH || event_queue_mark(&str_net->str_events, AST_GAME_READERS + int_channel));
+}
+
+static bool publish_accounts(Server *str_server, Network *str_net)
+{
+    for (unsigned int int_i = 0; int_i < 2; ++int_i) {
+        AstAccount_Response str_response = {0};
+        unsigned int int_identity = 0;
+        if (!accounts_next_response(str_server->ptr_accounts, &int_identity, &str_response)) break;
+        dds_return_t int_result = int_identity && int_identity <= AST_IDENTITIES ?
+            wire_write_account_response(str_net->arr_account_response[int_identity - 1], &str_response) :
+            DDS_RETCODE_BAD_PARAMETER;
+        OPENSSL_cleanse(&str_response, sizeof(str_response));
+        if (int_result != DDS_RETCODE_TIMEOUT && !dds_ok(int_result, "account_write")) return false;
+    }
+    return !accounts_failed(str_server->ptr_accounts);
 }
 
 /* Bound protected-reader work per identity; only one denial is logged per window. */
@@ -210,14 +268,21 @@ static bool network_init(Server *str_server, Network *str_net)
         str_net->arr_input[int_i] = endpoint(str_net->int_participant, &Ast_Input_desc, "Input", int_i + 1, false, false);
         str_net->arr_leave[int_i] = endpoint(str_net->int_participant, &Ast_Leave_desc, "Leave", int_i + 1, false, true);
         str_net->arr_response[int_i] = endpoint(str_net->int_participant, &Ast_Response_desc, "Response", int_i + 1, true, true);
+        str_net->arr_account_request[int_i] = endpoint(str_net->int_participant, &AstAccount_Request_desc,
+            "AccountRequest", int_i + 1, false, true);
+        str_net->arr_account_response[int_i] = endpoint(str_net->int_participant, &AstAccount_Response_desc,
+            "AccountResponse", int_i + 1, true, true);
         if (str_net->arr_join[int_i] < 0 || str_net->arr_input[int_i] < 0 || str_net->arr_leave[int_i] < 0 ||
-            str_net->arr_response[int_i] < 0) return false;
+            str_net->arr_response[int_i] < 0 || str_net->arr_account_request[int_i] < 0 ||
+            str_net->arr_account_response[int_i] < 0) return false;
         if (!event_reader_attach(&str_net->arr_events[int_i * 3], str_net->arr_join[int_i]) ||
             !event_reader_attach(&str_net->arr_events[int_i * 3 + 1], str_net->arr_input[int_i]) ||
-            !event_reader_attach(&str_net->arr_events[int_i * 3 + 2], str_net->arr_leave[int_i])) return false;
+            !event_reader_attach(&str_net->arr_events[int_i * 3 + 2], str_net->arr_leave[int_i]) ||
+            !event_reader_attach(&str_net->arr_events[AST_GAME_READERS + int_i], str_net->arr_account_request[int_i]))
+            return false;
     }
     /* One seed covers samples received before the listeners were installed. */
-    for (unsigned int int_i = 0; int_i < AST_EVENT_CHANNELS; ++int_i)
+    for (unsigned int int_i = 0; int_i < AST_DDS_READERS; ++int_i)
         if (!event_queue_mark(&str_net->str_events, int_i)) return false;
     return true;
 }
@@ -239,7 +304,7 @@ static bool publish_snapshot(Server *str_server, Network *str_net)
     mutex_unlock(&str_server->str_mutex);
     str_frame.int_seq = ++str_net->int_snapshot_seq;
     frame_to_wire(&str_frame, &str_snapshot);
-    return dds_ok(dds_write(str_net->int_snapshot, &str_snapshot), "snapshot_write");
+    return dds_ok(wire_write_snapshot(str_net->int_snapshot, &str_snapshot), "snapshot_write");
 }
 
 /* Sole DDS I/O owner. Listener bits and monotonic condition wait avoid polling. */
@@ -248,20 +313,25 @@ void *server_worker(void *ptr_server)
     Server *str_server = ptr_server;
     Network str_net = {0};
     bool b_ok = event_queue_init(&str_net.str_events);
-    for (unsigned int int_i = 0; b_ok && int_i < AST_EVENT_CHANNELS; ++int_i)
+    for (unsigned int int_i = 0; b_ok && int_i < AST_DDS_READERS; ++int_i)
         b_ok = event_reader_init(&str_net.arr_events[int_i], &str_net.str_events, int_i);
     if (b_ok) b_ok = network_init(str_server, &str_net);
+    if (b_ok) accounts_set_events(str_server->ptr_accounts, &str_net.str_events);
     if (b_ok) { puts("SERVER_READY security=NATIVE_DDS domain=42"); atomic_store(&str_server->b_ready, true); }
     while (b_ok && !atomic_load(&str_server->b_stop)) {
         uint32_t int_ready = 0;
         if (!event_queue_wait(&str_net.str_events, &int_ready)) { b_ok = false; break; }
         /* Queue lock is released before DDS loans, crypto, audit or game locks. */
-        for (unsigned int int_i = 0; int_i < AST_EVENT_CHANNELS && b_ok; ++int_i)
-            if (int_ready & (UINT32_C(1) << int_i)) b_ok = drain(str_server, &str_net, int_i);
-        if (b_ok) b_ok = publish_snapshot(str_server, &str_net);
+        for (unsigned int int_i = 0; int_i < AST_DDS_READERS && b_ok; ++int_i) {
+            if (!(int_ready & (UINT32_C(1) << int_i))) continue;
+            b_ok = int_i < AST_GAME_READERS ? drain(str_server, &str_net, int_i) :
+                drain_account(str_server, &str_net, int_i - AST_GAME_READERS);
+        }
+        if (b_ok) b_ok = publish_snapshot(str_server, &str_net) && publish_accounts(str_server, &str_net);
     }
     /* Native listener removal waits active callbacks; never hold the queue lock here. */
-    for (unsigned int int_i = 0; int_i < AST_EVENT_CHANNELS; ++int_i)
+    accounts_set_events(str_server->ptr_accounts, NULL);
+    for (unsigned int int_i = 0; int_i < AST_DDS_READERS; ++int_i)
         if (!event_reader_detach(&str_net.arr_events[int_i])) b_ok = false;
     if (str_net.int_participant > 0 && !dds_ok(dds_delete(str_net.int_participant), "delete_participant")) {
         fputs("DDS deletion failed; cannot release callback context safely\n", stderr); _Exit(EXIT_FAILURE);
@@ -269,7 +339,7 @@ void *server_worker(void *ptr_server)
     if (str_net.str_events.b_initialized && !event_queue_fini(&str_net.str_events)) {
         fputs("Event queue teardown failed\n", stderr); _Exit(EXIT_FAILURE);
     }
-    atomic_store(&str_server->b_failed, !b_ok);
+    if (!b_ok) atomic_store(&str_server->b_failed, true);
     atomic_store(&str_server->b_stop, true);
     return NULL;
 }

@@ -1,3 +1,26 @@
+# Account implementation review — 5 November 2026
+
+Reviewed the SQLite store, account worker, DDS dispatch, game score ownership and client profile/UI with independent storage, server-flow and client verification. The final native-certificate probe could neither join nor publish an AccountResponse. It also received denials for a forged account session, an unknown username and a rapid credential retry.
+
+| Finding | Disposition |
+|---|---|
+| High, Join authorization can go stale between inspection and allocation | `src/server/accounts.c` rechecks identity, nonce and account during the game attachment, before a slot is committed in `src/server/net_server.c`. |
+| High, slot reuse or round reset can discard or misattribute a score | `src/server/main.c` associates the simulated ship with its account/session and captures scores before replacement, release, reset and shutdown. `src/server/account_store.c` commits the transactional maximum. |
+| High, remembered token replay or stale replies after revocation | `src/server/accounts.c` retires account authority and clears cached replies. SQLite rotates or revokes the digest transactionally. Native restart/replay/logout/forget tests passed. |
+| Medium, local test credentials can disappear across WSL sessions | The launcher provisions its default CA in private Linux state. A new CA creates a separate account scope. The failed early GUI fixture and passing persistent-fixture rerun are recorded in the test report. |
+
+The live retry check proves one per-identity KDF limit under active play. Dedicated global account-channel saturation, injected disk-full recovery and external wire capture are still unverified. Earlier DDS/Valgrind findings are tracked separately.
+
+# J0 account proposal review — 5 November 2026
+
+Three real agents performed source/dependency/testability and protocol/storage review for the newly supplied handover. This is design review only. Reviewed drafts: ACCOUNT_APPROVAL.md, ACCOUNT_FEATURE_DESIGN.md, proposals/accounts_v1.idl and accounts_schema_v1.sql. No new implementation or resolution of historical native findings is claimed.
+
+Findings corrected in the draft: pre-Join account liveness via bounded KEEPALIVE/CLOSE; pending-KDF cancellation via zero-session live-flow CLOSE; fresh server challenge plus sequence high-water and whole-request retry matching; authority-generation secret-cache purge and serialized revocation ordering; versioned keyed score mailboxes preserving newer candidates; explicit one-certificate/one-principal/account scope and SQL uniqueness. Distinct players require distinct identities; nonce routing is not confidentiality between holders of the same private key. Per-operation field/response invariants, cheap reply limits, source ownership before score resets and durable-versus-pending UI state are explicit.
+
+Draft IDL compiles and its unapplied patch checks cleanly. SQL semantics/constraints and existing OpenSSL scrypt feasibility were exercised in scratch only. SQLite development dependency and concrete new topic/policy design await Stanley's approval under handover J0. Earlier HIGH/native safety findings remain historical/open and are excluded from this feature design task.
+
+---
+
 # Latest integration status: GUI verification blocked
 
 See the current blocker section below. Existing build/unit/headless passes are narrower than full graphical multiplayer acceptance.

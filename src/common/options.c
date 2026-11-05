@@ -1,6 +1,7 @@
 /* Strict finite CLI parsing. Author: <team>, Codex assistance. Date: 2026-11-03. */
 #include <errno.h>
 #include <math.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include "common/protocol.h"
@@ -20,13 +21,27 @@ static bool number(const char *str_text, unsigned int *int_out, unsigned int int
 bool options_parse(int int_argc, char **arr_argv, Options *str_options, bool b_server)
 {
     *str_options = (Options){.int_identity = 1, .dbl_duration = 60.0,
-                            .str_bot = "idle", .str_fault = "none", .str_audit_file = NULL};
+                            .str_bot = "idle", .str_fault = "none", .int_credentials_fd = -1};
     for (int int_i = 1; int_i < int_argc; ++int_i) {
         const char *str_arg = arr_argv[int_i];
         if (!b_server && strcmp(str_arg, "--headless") == 0) { str_options->b_headless = true; continue; }
+        if (!b_server && strcmp(str_arg, "--register") == 0) { str_options->b_register = true; continue; }
+        if (!b_server && strcmp(str_arg, "--remember") == 0) { str_options->b_remember = true; continue; }
+        if (!b_server && strcmp(str_arg, "--account-only") == 0) { str_options->b_account_only = true; continue; }
         if (++int_i == int_argc) return false;
         const char *str_value = arr_argv[int_i];
         if (strcmp(str_arg, "--security-dir") == 0) str_options->str_security_dir = str_value;
+        else if (b_server && strcmp(str_arg, "--account-dir") == 0) str_options->str_account_dir = str_value;
+        else if (!b_server && strcmp(str_arg, "--profile-dir") == 0) str_options->str_profile_dir = str_value;
+        else if (!b_server && strcmp(str_arg, "--credentials-fd") == 0) {
+            unsigned int int_fd = 0;
+            if (strcmp(str_value, "0") != 0 && !number(str_value, &int_fd, INT_MAX)) return false;
+            str_options->int_credentials_fd = (int)int_fd;
+        } else if (!b_server && strcmp(str_arg, "--account-action") == 0) {
+            if (strcmp(str_value, "leaderboard") && strcmp(str_value, "logout") && strcmp(str_value, "forget")) return false;
+            str_options->str_account_action = str_value;
+            str_options->b_account_only = true;
+        }
         else if (b_server && strcmp(str_arg,"--test-scenario") == 0) {
             if(strcmp(str_value,"gameover") != 0) return false;
             str_options->b_test_gameover = true;
@@ -53,5 +68,6 @@ bool options_parse(int int_argc, char **arr_argv, Options *str_options, bool b_s
             str_options->str_fault = str_value;
         } else return false;
     }
-    return true;
+    return (!str_options->b_register || str_options->int_credentials_fd >= 0) &&
+           (!str_options->b_account_only || str_options->b_headless);
 }

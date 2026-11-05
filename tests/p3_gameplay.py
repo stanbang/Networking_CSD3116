@@ -45,6 +45,9 @@ def check_server(path, require_gameover):
     print("PASS authoritative gameplay effects", flush=True)
 
 
+from account_fixture import AccountFixture
+
+
 def main():
     """Run finite secured bots; preserve logs and stop only owned processes."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -58,12 +61,13 @@ def main():
     out = Path("build/p3-gameplay")
     out.mkdir(parents=True, exist_ok=True)
     children, streams = [], []
+    accounts = AccountFixture()
 
     def start(name, kind, extra):
         path = out / f"{name}.log"
         stream = path.open("w")
         streams.append(stream)
-        process = subprocess.Popen([str(Path(args.bin_dir).resolve()/kind), "--security-dir",
+        process = accounts.spawn([str(Path(args.bin_dir).resolve()/kind), "--security-dir",
                                     args.security_dir, *extra], stdout=stream, stderr=subprocess.STDOUT)
         children.append(process)
         return process, path

@@ -13,6 +13,7 @@ import signal
 import subprocess
 import sys
 import time
+from account_fixture import AccountFixture
 
 
 def wait_for(path, pattern, child, deadline, seconds=8):
@@ -99,6 +100,7 @@ def main():
     args.output_dir.mkdir(parents=True, exist_ok=False)
     binaries = args.bin_dir.resolve()
     children, streams, events = [], [], []
+    accounts = AccountFixture()
     result = dict(scope='isolated single-identity Leave/ACK diagnostic',
                   server_duration_seconds=60, client_duration_seconds=30,
                   production_ack_timeout_seconds=1, events=events)
@@ -114,7 +116,7 @@ def main():
             env['LD_PRELOAD'] = str(marker)
         command = [str(binaries / kind), '--security-dir', str(bundle), *extra]
         print('COMMAND ' + ' '.join(command), flush=True)
-        child = subprocess.Popen(command, stdout=stream, stderr=subprocess.STDOUT, env=env)
+        child = accounts.spawn(command, stdout=stream, stderr=subprocess.STDOUT, env=env)
         children.append((kind, child))
         events.append(dict(event='child_started', role=kind, pid=child.pid,
                            monotonic_ns=time.monotonic_ns()))

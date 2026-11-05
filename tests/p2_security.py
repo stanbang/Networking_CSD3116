@@ -14,6 +14,7 @@ import time
 sys.dont_write_bytecode = True
 from p1_network import stop, wait_line
 from verify_audit import verify
+from account_fixture import AccountFixture
 
 
 class Run:
@@ -21,7 +22,8 @@ class Run:
     def __init__(self, binaries, security, out):
         self.binaries, self.security, self.out = binaries, security, out
         self.children, self.files = [], []
-        out.mkdir(parents=True, exist_ok=True)
+        self.accounts = AccountFixture()
+        out.mkdir(parents=True, exist_ok=False)
 
     def start(self, name, kind, extra, env=None):
         """Launch one secured process with bounded test-provided duration."""
@@ -30,7 +32,7 @@ class Run:
         stream = path.open("w")
         self.files.append(stream)
         print("COMMAND", " ".join(command), flush=True)
-        process = subprocess.Popen(command, stdout=stream, stderr=subprocess.STDOUT, env=env)
+        process = self.accounts.spawn(command, stdout=stream, stderr=subprocess.STDOUT, env=env)
         self.children.append(process)
         return process, path
 
@@ -173,8 +175,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--security-dir", required=True)
     parser.add_argument("--bin-dir", default="build/release")
+    parser.add_argument("--output-dir", default="build/p2-test",
+                        help="New evidence directory; existing paths are refused")
     args = parser.parse_args()
-    run = Run(Path(args.bin_dir).resolve(), args.security_dir, Path("build/p2-test"))
+    run = Run(Path(args.bin_dir).resolve(), args.security_dir, Path(args.output_dir))
     audit = (run.out / "server-audit.log").resolve()
     try:
         environment = dict(os.environ, LD_PRELOAD=str(Path("build/rtps_fault.so").resolve()))

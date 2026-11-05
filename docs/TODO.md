@@ -1,4 +1,30 @@
-# Paused checkpoint - latest authoritative status
+# Jordain's assigned features — implementation and handoff, 5 November 2026
+
+The supplied teammate handover assigns account login, saved high scores and leaderboard, and remembered-user tokens. See [the approved design](ACCOUNT_FEATURE_DESIGN.md) and [test evidence](TEST_REPORT.md).
+
+- [x] Read/compare the attachment with the repository handover and inspect current source; features absent.
+- [x] Prepare and independently review bounded protocol/storage/session design; validate draft IDL/patch syntax, SQL constraints/max updates and existing OpenSSL scrypt feasibility.
+- [x] Jordain confirmed Stanley approved the account protocol, policies and SQLite dependency.
+- [x] Jordain installed `libsqlite3-dev` in Ubuntu. Preflight reported SQLite 3.45.1.
+- [x] J1 account worker, login/register UI and certificate/account gate before Join.
+- [x] J2 authoritative best-score persistence and leaderboard.
+- [x] J3 private profiles, token resume/rotation/logout/forget.
+- [x] J4 automated account, gameplay and security regressions and documentation.
+- [ ] Stanley manually accepts login/logout, score persistence, Remember Me/Forget and two-player controls.
+- [ ] Review and commit the local changes, then reproduce from a fresh checkout of the published revision.
+- [ ] Finish the separate packet-capture, two-machine and submission checks below.
+
+The earlier native TSan and Valgrind findings remain open under the original integration checklist.
+
+---
+
+# Current review — Jordain, 4 November 2026
+
+Read [CURRENT_REVIEW.md](CURRENT_REVIEW.md) for the latest review of pulled commit `3dae8e3`. Fresh forced build/unit/hardening, secure P1 lifecycle and strict two-client GUI checks all passed on Jordain's machine, including normal shutdown. Stanley's preserved ACK timeout/server hang remain unresolved cross-host findings; P4, distributed/capture evidence, P5 and P6 are incomplete. No production source changes, phase approval, commit or push occurred. The handover and older checklist below remain historical context.
+
+---
+
+# Paused teammate checkpoint — historical status
 
 Stanley explicitly paused the goal on4November2026 and requested a teammate handover plus publication. Read HANDOVER.md first. The listener repair preserves active two-client GUI state in the latest targeted run, but overall GUI/network checks still FAIL native one-second Leave ACK timeout. No further game tests/repairs after pause. Selected portable raw evidence is in docs/evidence/2026-11-04-handover/. Earlier status text below is historical. No goal-complete or submission-ready claim.
 
@@ -26,7 +52,7 @@ Checkpoint: 2026-11-04. Two-computer setup is paused at the user's request. Game
 
 ## 1. Resolve memory/thread verification findings (highest priority)
 
-- [ ] Human installs missing CMake inside Ubuntu: `sudo apt update` then `sudo apt install -y cmake`.
+- [x] Human installed CMake inside Ubuntu; version 3.28.3 verified on 4 November. Exact-source symbol/TSan core and security-plugin builds now exist; investigation results are recorded separately.
 - [ ] Build/investigate a matching instrumented Cyclone DDS/security dependency in isolated Linux storage; keep release protections and the original reference files intact.
 - [ ] Resolve unsuppressed TSan reports in the current DDS recvmsg/memcpy and mutex lifetime paths. Do not declare them false positives merely because the system library is uninstrumented.
 - [ ] Resolve Valgrind's uninitialised bytes reaching client sendmsg through native DDS/OpenSSL crypto. All six processes freed their heap, but the reported errors still fail acceptance.
@@ -49,7 +75,7 @@ The second PC reportedly has Windows/Ubuntu/WSL and the project. Shared-network 
 ## 3. Finish verification and reproducibility
 
 - [ ] Run the full ten-minute five-client sanitizer soak with random join/leave/rejoin. Completed churn so far is 120seconds, not ten minutes.
-- [ ] After committing, verify build/run from an actual clean clone. A fresh public source-copy build passed; no literal clone run has been completed.
+- [x] Literal clean clone of committed `3dae8e3`: warning-free build, all unit tests and hardening pass. Pending continuation edits are not included; repeat after the final checkpoint.
 - [ ] Perform external authorised tcpdump/Wireshark inspection of protected gameplay traffic. In-process postcrypto GCM observations passed, while unprivileged external capture was denied.
 - [ ] Complete human control/smoothness/visual and two-machine playtest in PLAYTEST.md.
 - [ ] Review documented limits: 64 sessions per identity per server lifetime, automatic session recovery after server restart absent, HUD can overlap asteroid graphics, Ubuntu x86_64 plugin path dependency.

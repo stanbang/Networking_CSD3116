@@ -1,5 +1,7 @@
 # Phase approval workflow
 
+Jordain reported Stanley's approval of the account proposal on 5 November 2026 and authorized implementation. Jordain then installed `libsqlite3-dev` in Ubuntu. Manual acceptance of the implemented account features remains pending.
+
 Purpose: preserve the user's direct instruction update of 4 November 2026 (Singapore). Maintained by the CSD3116 team with Codex assistance.
 
 This workflow supersedes conflicting automatic-advance/default-decision text in the original prompts. Keep the existing P0-P6 plan, work and real builder/reviewer/tester subagents.
@@ -17,7 +19,7 @@ This workflow supersedes conflicting automatic-advance/default-decision text in 
 
 - Current phase: P1 integration/revalidation of contributor implementation. P0 approved; current live window state must be checked, not inferred from historical P0 notes.
 - P0 APPROVED by the user: "Approved. instructions work and terminal captured this" (4 November 2026). Natural-language approval accepted; no approval of security choice or breaking IDL is implied.
-- Security choice APPROVED: user replied "A. make sure it follows this pdf specifications exactly . this rubric decides my grade" on4 November2026. Native DDS Security selected; not implemented or verified yet.
+- Security choice APPROVED: user replied "A. make sure it follows this pdf specifications exactly . this rubric decides my grade" on4 November2026. Native DDS Security was subsequently merged. Jordain's 4 November full negative-security rerun passed; this records runtime evidence, not a new human phase approval.
 - User authorized integration of merged main and proceeding with v2/P1. Existing merged Ast IDL retained; differences from the earlier draft documented in INTEGRATION.md. Further breaking IDL changes require approval.
 - GUI tools: all required tools are now present, including xdotool at /usr/bin/xdotool (dpkg1:3.20160805.1-5build1). Initial missing-package checks are historical.
 - Human loopback capture attempted: zero packets, no file produced, NOT PASSED. Filter correction passed offline IPv4 tests; actual retry capture still pending. Offline validation is not real traffic evidence.
@@ -25,4 +27,4 @@ This workflow supersedes conflicting automatic-advance/default-decision text in 
 Record phase approvals here and in `PROGRESS.md` when they arrive, with the exact user instruction. Do not turn an automatic goal continuation into a manual approval.
 
 
-Current P1 integration gate: incomplete after secure GUI failure; no APPROVED P1 received. Own checks are not all passing, so no manual acceptance checklist is issued as a successful phase. Await authorization for a new bounded repair cycle under CODEX_GOAL loop limit. No next phase starts automatically.
+Latest continuation: Jordain requested "can you continue to do it" on 4 November after reviewing the pulled-code checklist. Integration/safety investigation and evidence work resumed under that instruction; no APPROVED P1 is invented. Fresh P1/strict GUI checks pass on Jordain's host; earlier Stanley-host ACK timeout/server hang remain open. CMake was installed by the human and verified at 3.28.3. Current evidence is in CURRENT_REVIEW.md; historical gate/failure text elsewhere remains historical. Breaking IDL changes and formal phase acceptance are not implied.

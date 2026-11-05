@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include "common/account_protocol.h"
 #include "common/audit_log.h"
 #include "common/protocol.h"
 
@@ -124,10 +125,54 @@ static void audit_creation_cases(void)
     puts("PASS audit exclusive creation and symlink target preservation");
 }
 
+static void account_cases(void)
+{
+    AstAccount_Request str_req = {.int_version = AstAccount_VERSION, .int_operation = AstAccount_LOGIN,
+        .int_seq = 1, .arr_client_nonce = {1}, .arr_request_nonce = {2}, .arr_server_epoch = {3},
+        .arr_server_challenge = {4}, .int_username_length = 24, .int_password_length = 128};
+    memset(str_req.arr_username, 'a', sizeof(str_req.arr_username));
+    memset(str_req.arr_password, '~', sizeof(str_req.arr_password));
+    assert(account_request_valid(&str_req));
+    str_req.int_password_length = 129; assert(!account_request_valid(&str_req));
+    str_req.int_password_length = 0; assert(!account_request_valid(&str_req));
+    str_req.int_password_length = 128;
+    str_req.int_username_length = 25; assert(!account_request_valid(&str_req));
+    str_req.int_username_length = 0; assert(!account_request_valid(&str_req));
+    str_req.int_username_length = 24;
+    str_req.arr_username[0] = 0xc3; assert(!account_request_valid(&str_req));
+    str_req.arr_username[0] = 'A'; assert(!account_request_valid(&str_req));
+    str_req.arr_username[0] = 'a';
+    str_req.arr_password[0] = 0; assert(!account_request_valid(&str_req));
+    str_req.arr_password[0] = ' ';
+    str_req.int_operation = UINT16_MAX; assert(!account_request_valid(&str_req));
+    str_req.int_operation = AstAccount_LOGIN;
+    str_req.int_seq = 0; assert(!account_request_valid(&str_req));
+    str_req.int_seq = 1;
+    str_req.arr_account_session[0] = 1; assert(!account_request_valid(&str_req));
+    str_req.arr_account_session[0] = 0;
+    memset(str_req.arr_username + 3, 0, 21);
+    memset(str_req.arr_password + 12, 0, 116);
+    str_req.int_username_length = 3; str_req.int_password_length = 12;
+    assert(account_request_valid(&str_req));
+    str_req.arr_password[127] = 'x'; assert(!account_request_valid(&str_req));
+
+    AstAccount_Response str_rsp = {.int_version = AstAccount_VERSION, .int_operation = AstAccount_LEADERBOARD,
+        .int_seq = 1, .int_request_seq = 2, .arr_client_nonce = {1}, .arr_request_nonce = {2},
+        .arr_server_epoch = {3}, .arr_server_challenge = {4}, .b_persisted = true,
+        .int_account_id = 1, .int_username_length = 3, .arr_username = {'a', 'b', 'c'}};
+    assert(account_response_valid(&str_rsp));
+    str_rsp.int_entry_count = 11; assert(!account_response_valid(&str_rsp));
+    str_rsp.int_entry_count = 0;
+    str_rsp.int_account_id = UINT64_MAX; assert(!account_response_valid(&str_rsp));
+    str_rsp.int_account_id = 1;
+    str_rsp.int_status = UINT16_MAX; assert(!account_response_valid(&str_rsp));
+    puts("PASS account length, ASCII, role, sequence and leaderboard boundaries");
+}
+
 /* Assertions intentionally abort with nonzero status on validation regressions. */
 int main(void)
 {
-    handshake_cases(); input_cases(); snapshot_cases(); entity_cases(); audit_creation_cases();
+    handshake_cases(); input_cases(); snapshot_cases(); entity_cases(); audit_creation_cases(); account_cases();
     /* Regression: worker receives heartbeat after main sampled its tick time. */
     assert(!lease_expired(100, 101));
     assert(!lease_expired(AST_LEASE_NS - 1, 0));

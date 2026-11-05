@@ -1,5 +1,20 @@
 # Evidence for slides - 5 November 2026
 
+## Jordain's account handoff
+
+The account build adds mandatory certificate-bound login, SQLite best scores and leaderboard, and rotating Remember Me tokens. [Automated results and reproduction](TEST_REPORT.md#j1j4-account-verification--5-november-2026). [Masked login](evidence/2026-11-05-accounts/client1-masked-login.png). [Player 1](evidence/2026-11-05-accounts/client1-10s.png) and [player 2](evidence/2026-11-05-accounts/client2-10s.png) after ten seconds.
+
+For a short walkthrough, follow `idl/accounts.idl` and `tools/gen_certs.sh` for topic authority, `src/server/accounts.c` for the challenge and single storage worker, `src/server/main.c` for simulation score capture, `src/server/account_store.c` for scrypt and transactions, and `src/client/profile.c` for the client token file.
+
+Stanley's manual acceptance checklist:
+
+1. Use the same current certificate bundle across launches. Register two distinct accounts and confirm that both connected windows accept separate movement and firing inputs.
+2. Earn a score, close the players and restart the server through the same launcher. Sign in and open the leaderboard with B. Check the saved best against the first run.
+3. Enable F2 for one player. Close the local session and relaunch. Check that player resumes and the other player receives the login form.
+4. Press F3 during play, close and relaunch. Confirm the forgotten profile requires login. Sign in, press L and confirm the game returns to the login form.
+
+The earlier slim checkpoint inventory follows.
+
 This is an evidence inventory, not slides or a claim that the assignment rubric is fully satisfied. Slim finish mode excludes further GUI investigation, TSan/Valgrind dependency investigation, two-computer testing, slide production and video production. No new benchmark or sanitizer run was performed. T3 was approved by the user. T4 live capture/analysis remains pending. README, handover, AI-use notes and source-ZIP instructions are updated in RUN_AND_VERIFY.md; no final archive/submission is claimed.
 
 ## Reproduction provenance

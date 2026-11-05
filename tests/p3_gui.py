@@ -13,6 +13,7 @@ import sys
 import time
 sys.dont_write_bytecode = True
 from p1_network import stop, wait_line
+from account_fixture import AccountFixture
 
 
 def command(*args):
@@ -24,6 +25,8 @@ def window_for(process):
     """Require both PID and title: xdotool's default OR can select the wrong peer."""
     deadline = time.monotonic() + 8
     while time.monotonic() < deadline:
+        if process.poll() is not None:
+            raise AssertionError(f"GUI child {process.pid} exited before its window was visible")
         result = subprocess.run(["xdotool", "search", "--all", "--onlyvisible", "--pid",
                                  str(process.pid), "--name", "DDS Asteroids"],
                                 capture_output=True, text=True, timeout=2)
@@ -31,6 +34,16 @@ def window_for(process):
             return result.stdout.splitlines()[0]
         time.sleep(.1)
     raise AssertionError(f"No GUI window for child {process.pid}")
+
+
+def login_fields(window, username, password):
+    """Drive the actual form, keeping the generated password out of argv."""
+    command("xdotool", "windowfocus", "--sync", window)
+    for index, value in enumerate((username, password)):
+        if index:
+            command("xdotool", "key", "Tab")
+        subprocess.run(["xdotool", "type", "--clearmodifiers", "--file", "/dev/stdin"],
+                       input=value.encode("ascii"), check=True, timeout=8)
 
 
 def snapshots(out, windows, label):
@@ -148,29 +161,43 @@ def main():
     binaries = Path(args.bin_dir).resolve()
     environment = dict(os.environ, LIBGL_ALWAYS_SOFTWARE="1")
     processes, streams = [], []
+    accounts = AccountFixture()
 
     def start(name, kind, extra):
         path = out / f"{name}.log"
         stream = path.open("x")
         streams.append(stream)
-        child = subprocess.Popen([str(binaries/kind), "--security-dir", args.security_dir,
-                                  "--duration", "25", *extra], stdout=stream,
-                                 stderr=subprocess.STDOUT, env=environment)
+        child = accounts.spawn([str(binaries/kind), "--security-dir", args.security_dir,
+                                "--duration", "35", *extra], credentials=False,
+                               stdout=stream, stderr=subprocess.STDOUT, env=environment)
         processes.append(child)
         return child, path
 
     try:
         server, log = start("server", "server", ["--audit-file", str(out/"audit.log")])
-        time.sleep(.5)
-        clients, windows = [], []
+        wait_line(log, r"SERVER_READY ", server)
+        clients, windows, logs = [], [], []
         for identity in (1, 2):
             process, path = start(f"client{identity}", "client", ["--identity", str(identity)])
-            wait_line(path, r"CLIENT_JOIN .*status=accepted", process)
+            wait_line(path, r"CLIENT_LOGIN_READY", process)
             window = window_for(process)
             command("xdotool", "windowmove", window, (identity-1)*810, 0)
             clients.append(process)
             windows.append(window)
+            logs.append(path)
         assert windows[0] != windows[1], "Must exercise distinct GUI windows"
+        for identity, window in enumerate(windows, 1):
+            login_fields(window, *accounts.credentials(identity))
+        command("xdotool", "windowfocus", "--sync", windows[0])
+        command("xdotool", "key", "F2")
+        snapshots(out, windows, "masked-login")
+        for window in windows:
+            command("xdotool", "windowfocus", "--sync", window)
+            command("xdotool", "key", "shift+Return")
+        for process, path in zip(clients, logs):
+            wait_line(path, r"CLIENT_ACCOUNT operation=register status=0", process, timeout=12)
+            wait_line(path, r"CLIENT_JOIN .*status=accepted", process, timeout=12)
+        assert "CLIENT_PROFILE saved=1" in logs[0].read_text()
         exercise(out, server, log, clients, windows)
     finally:
         for process in reversed(processes):

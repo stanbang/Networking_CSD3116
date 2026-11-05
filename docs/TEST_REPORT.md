@@ -1,3 +1,127 @@
+# Preflight before two-PC testing — 5 November 2026
+
+The local working tree passed a fresh `-Werror` build, unit tests and hardening under Ubuntu/WSL2. Account integration, strict two-window gameplay, P1 lifecycle and P2 native security each exited 0. The runtime checks used a separate DDS UDP port base with the same domain 42 and signed policies to avoid interfering with the user's local session. The current account build is still local.
+
+```text
+PASS two accounts played and server saved an earned best of 520
+PASS persisted leaderboard, token rotation and replay rejection, credential binding, logout and forget revocation
+PASS secure two-GUI lifecycle, real key input and >=10s rendering; inspect screenshots
+SERVER_SUMMARY joins=13 rejects=1 leaves=12 timeouts=1 invalid=4 stale=1 peak=5 inputs=731 rate_hits=0 auth_failures=0 middleware_events=20 moves=4597 shots=388 destroyed=61 splits=27 hits=1 respawns=1 gameovers=0 restarts=0 wraps=0 snapshots=463 points=4480 ticks=1424
+PASS P1 networking lifecycle and malformed-message counters
+PASS actual ciphertext send: byte=52 packet_bytes=344
+PASS receiver OpenSSL GCM authentication failure observed
+PASS audit chain records=134 root=1350aff7d1ea0ef1d60b96e324322947c64111dfae1916f7816b99b44e6f9b4b
+PASS non-loopback DDS unicast and three separately exported role bundles on one WSL host
+```
+
+The last probe selected `eth0` and a local unicast peer. The server and both clients each used a minimal exported credential bundle. Both clients registered, received snapshots and left cleanly. The non-loopback interface and role bundles worked on one WSL host. Cross-machine routing, VPN reachability and the second PC's build still need testing. No VPN or firewall settings were changed. Raw outputs, scratch configuration and inspected GUI screenshots are in `build/evidence/preflight-20261105/`.
+
+# J1–J4 account verification — 5 November 2026
+
+Ubuntu on Jordain's Windows machine, SQLite 3.45.1, Cyclone DDS 0.10.4. The binaries were built from the local working tree on `480227c`, including the preserved local integration changes. The fresh build used new generated-IDL and output directories with `-Werror`. The native tests ran sequentially on domain 42 with a current private Linux-home bundle.
+
+| Check | Result and retained evidence |
+|---|---|
+| Fresh build, units and hardening | Exit 0. Both IDLs regenerated. Both binaries report `PASS PIE NX RELRO BIND_NOW CANARY references=2`. Account validators passed length, ASCII, role, sequence and leaderboard boundaries. |
+| SQLite unit and storage review | Exit 0 with private ownership and file modes, exclusive lock, hashed token, expiry, revoked and rotated token rejection, wrong identity, RNG rollback, lower/duplicate score idempotence, provenance and refusal to overwrite unsafe or corrupt files. Separate strict UBSan fixture also exited 0. |
+| Live accounts and restart | Exit 0, `build/evidence/accounts-live-04/`. A native-certified peer could not join without an account or publish an account response. Forged account session, unknown account, rapid retry, duplicate active account, wrong password and wrong certificate identity were denied. The server retained an earned best of 270 and returned it from the restarted process. Resume across client restart rotated the token. Old-token replay was denied. Logout and Forget removed the profile and revoked the token. |
+| P1 lifecycle | Exit 0, `build/evidence/accounts-p1-02/`. `joins=13 rejects=1 leaves=12 timeouts=1 invalid=4 stale=1 peak=5`. Fresh explicit Leaves, replacement, the deliberately killed client's lease and protocol faults all matched expectations. Audit verified 58 records with root `51995368ab17f004324ae60a63892d28959618d98b7a838beba425dee7dc7333`. |
+| Native P2 negative security | Exit 0, `build/evidence/accounts-p2-01/`. No-cert, wrong-CA and rogue-server refused. Slow reader, three rate-limited gameplay floods and real post-encryption tamper checks passed. Receiver OpenSSL GCM failure was observed. Audit verified 127 records and detected both content modification and truncation. |
+| Strict two-window GUI | Exit 0, `build/evidence/accounts-gui-02/`. Both players typed registration details, received fresh game state and moved/fired with real X input. Two final PNGs show connected players, ships and asteroids. [Masked login](evidence/2026-11-05-accounts/client1-masked-login.png), [P1 after 10 seconds](evidence/2026-11-05-accounts/client1-10s.png), [P2 after 10 seconds](evidence/2026-11-05-accounts/client2-10s.png). |
+| Live game-over and restart | Exit 0, `build/evidence/accounts-gameover-01/`. Controlled collision produced game-over at tick 182, and ordinary encrypted client input restarted at tick 189. Both clients left gracefully. |
+| Default launcher and private data guard | Exit 0 for `bash tools/play_local.sh --headless --duration 8` with newly provisioned Linux-home credentials and two admitted clients. `tools/check_secrets.sh` passed. |
+| Two-minute launcher run | Exit 0, `build/local-session.wViKo70j/`. `joins=2 timeouts=0 invalid=0 moves=14209 destroyed=263 points=19280 ticks=7200`. Both clients received snapshots through tick 7195 or later and exited normally. The server reached its own deadline first and committed both scores at shutdown. |
+| Graphical launcher entry | Exit 0 under Xvfb, `build/local-session.0wVekLii/`. Both windows reported `CLIENT_LOGIN_READY` and exited normally at the session limit. The separate strict GUI test exercised registration and gameplay. |
+
+Selected actual test output:
+
+```text
+PASS account length, ASCII, role, sequence and leaderboard boundaries
+PASS exclusive store lock and private file modes
+PASS score max and leaderboard persist across database reopen
+PASS verifier storage, hashed token and original score provenance
+PASS token expiry, binding, rotation, rollback and revocation
+PASS unsafe database paths refused and existing bytes preserved
+PASS certificate alone cannot join or publish an account response
+PASS forged account session, unknown account and rapid credential retry denied
+PASS two accounts played and server saved an earned best of 270
+PASS persisted leaderboard, token rotation and replay rejection, credential binding, logout and forget revocation
+PASS P1 networking lifecycle and malformed-message counters
+PASS actual ciphertext send: byte=52 packet_bytes=344
+PASS receiver OpenSSL GCM authentication failure observed
+PASS P2 harness assertions; native rejection/rate details require report evidence
+LIVE_STATE client=1 id=1 samples=12 first_tick=131 last_tick=797
+LIVE_STATE client=2 id=2 samples=12 first_tick=151 last_tick=815
+SERVER_SUMMARY joins=2 rejects=0 leaves=2 timeouts=0 invalid=0 stale=0 peak=2 inputs=225 rate_hits=0 auth_failures=0 middleware_events=5 moves=793 shots=12 destroyed=3 splits=3 hits=2 respawns=2 gameovers=0 restarts=0 wraps=0 snapshots=272 points=90 ticks=826
+PASS secure two-GUI lifecycle, real key input and >=10s rendering; inspect screenshots
+GAME_EVENT gameover tick=182
+GAME_EVENT restart tick=189
+PASS controlled encrypted collision/game-over/ordinary-input restart
+```
+
+The first GUI run exited early because its temporary certificate directory had disappeared between WSL sessions. The persistent Linux-home bundle resolved that prerequisite. An intermediate new rate-limit probe omitted the fresh HELLO required after a failed login. The corrected probe completed on the same game build. Evidence folders `accounts-gui-01` and `accounts-live-03` retain the failed runs.
+
+Reproduce inside Ubuntu with a new signed bundle and new output names:
+
+```bash
+make -j2 all test build/release/account-join-probe check-hardening
+python3 -B tests/account_integration.py --security-dir "$BUNDLE" --output-dir build/accounts-live-check-01
+python3 -B tests/p1_network.py --security-dir "$BUNDLE" --output-dir build/accounts-p1-check-01
+cc -shared -fPIC -Wall -Wextra tests/rtps_fault.c -o build/rtps_fault.so -ldl -pthread -lcrypto
+python3 -B tests/p2_security.py --security-dir "$BUNDLE" --output-dir build/accounts-p2-check-01
+xvfb-run -a -s '-screen 0 1620x650x24' python3 -B tests/p3_gui.py --security-dir "$BUNDLE" --output-dir build/accounts-gui-check-01
+python3 -B tests/p3_gameover.py --security-dir "$BUNDLE" --output-dir build/accounts-gameover-check-01
+bash tools/play_local.sh --headless --duration 120
+```
+
+Manual acceptance, external capture, two-machine play, dedicated global account-channel saturation, injected disk-full recovery and fresh published-checkout reproduction remain open. Native TSan/Valgrind dependency findings are tracked separately.
+
+---
+
+# J0 proposal feasibility — 5 November 2026
+
+Scope: account-feature design only. No production login, C storage, remembered profile, new topic permission or game-schema implementation is tested/claimed.
+
+| Check | Actual result |
+|---|---|
+| Current source inspection | Account login/storage/leaderboard/profile modules absent; scores are volatile |
+| SQLite C dependency | Header/pkg-config support missing; installation requires approval and human action |
+| Draft `accounts_v1.idl` | Installed Cyclone idlc exits 0 in scratch output |
+| Proposed `idl/accounts.idl` patch | `git apply --check` exits 0; production file remains absent and patch unapplied |
+| Draft SQL via Python SQLite 3.45.1 | In-memory schema, one-account/identity, capacity six, username constraints, max/lower/duplicate score behavior, account isolation, rollback, token binding/expiry/compare-and-swap constraints pass |
+| OpenSSL scrypt feasibility | Warning-strict compile and run exit 0; N=131072/r=8/p=1, maxmem167772160, three derivations428315367/408776511/336227400ns, peakRSS136600KiB; matching and changed-input checks pass |
+
+No secret values printed, no real accounts/database/profile created, no new package installed, no native investigation/network session run. SQL smoke checks use Python's existing SQLite runtime, not the missing C development package. Selected outputs: `docs/evidence/2026-11-05-accounts-j0/`; scratch sources/complete outputs: `build/account-j0/`. Independent design review corrections cover pre-Join liveness, flow replay/cancellation, secret-cache invalidation, score-mailbox versioning and same-certificate trust. Implementation/runtime acceptance is pending approval.
+
+---
+
+# Pull integration verification — 5 November 2026
+
+Tested `480227c` plus restored local work, after resolving the five upstream/stash overlaps. This is verification of the combined working tree, not a claim that uncommitted work is published or all project phases are complete.
+
+| Check | Actual result |
+|---|---|
+| `make -j2 all test check-hardening` | Exit 0; protocol, simulation and event-queue units plus both executable hardening checks pass |
+| Strict timeout fixture compile | Exit 0 with `-Wall -Wextra -Werror` |
+| Updated native-secure P1 lifecycle | Exit 0; fresh server release verified after graceful departures, capacity/refusal/crash recovery/fault cases and audit verified |
+| Explicit injected ACK timeout | Exit 0; warning retained, client exits normally, real server/audit Leave observed; this is not evidence of native ACK reliability |
+| Merge preservation | All 22 original local changed/new files restored; 17 outside the five intentional conflict resolutions unchanged after newline normalization; backup and stash retained |
+
+Selected actual output:
+
+```text
+SERVER_SUMMARY joins=13 rejects=1 leaves=12 timeouts=1 invalid=4 stale=1 peak=5 inputs=381 rate_hits=0 auth_failures=0 middleware_events=8 moves=2475 shots=210 destroyed=35 splits=19 hits=0 respawns=0 gameovers=0 restarts=0 wraps=0 snapshots=235 points=2280 ticks=709
+PASS lifecycle audit records=38 root=3915581ee18bcfde3a32dd20084185f790b34ebb61fd63c9c67f6a83f2b53b00
+PASS P1 networking lifecycle and malformed-message counters
+CLIENT_LEAVE_ACK matched_before=1 matched_after=1 result=-10 requested_ns=1000000000 elapsed_ns=361 clock_valid=1
+CLIENT_WARNING leave_ack_timeout: transport acknowledgement unconfirmed; server slot release requires independent verification
+CLIENT_EXIT
+```
+
+The timeout fixture returns immediately by design; its 361 ns elapsed is not a native one-second timeout measurement. Its summary reports client/server cleanup exit 0, server/audit Leave observed and status PASS. Raw commands, output and exit statuses: `build/evidence/pull-480227c-20261105T030706Z/`. Historical native safety findings remain open; no GUI, full P2, sanitizer or performance result is implied by this pull check.
+
+---
+
 # P0 independent test report
 
 Purpose: record environment and baseline acceptance evidence. Author: <team>, with Codex tester assistance. Date: 2026-11-03.

@@ -3,6 +3,7 @@
 # Run inside Ubuntu: bash tools/play_local.sh [--headless] [--duration SECONDS]
 # A full local provisioning fixture stays in private Linux storage, never the repo.
 set -euo pipefail
+umask 077
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 int_duration=3600
 b_headless=false
@@ -35,6 +36,13 @@ usable_bundle() {
     # validity too so an old cached bundle is regenerated before starting DDS.
     str_policy=$(openssl smime -verify -purpose any -in "$str_root/permissions/$str_identity.p7s" \
       -CAfile "$str_root/permissions_ca/ca.crt" 2>/dev/null) || return 1
+    if [[ $str_identity == server ]]; then
+      [[ $str_policy == *'<topic>DDSAsteroids_AccountRequest_1</topic>'* &&
+         $str_policy == *'<topic>DDSAsteroids_AccountResponse_6</topic>'* ]] || return 1
+    else
+      [[ $str_policy == *"<topic>DDSAsteroids_AccountRequest_${str_identity#client}</topic>"* &&
+         $str_policy == *"<topic>DDSAsteroids_AccountResponse_${str_identity#client}</topic>"* ]] || return 1
+    fi
     [[ $str_policy =~ \<not_after\>([^\<]+)\</not_after\> ]] || return 1
     int_expiry=$(date -d "${BASH_REMATCH[1]}" +%s) || return 1
     (( int_expiry > $(date +%s) + int_duration )) || return 1
@@ -47,10 +55,15 @@ if [[ -z $str_security_arg && $b_fresh == false && -f build/local-security-dir ]
   IFS= read -r str_security < build/local-security-dir || true
 fi
 if [[ -n $str_security_arg ]] && ! usable_bundle "$str_security"; then
-  echo "Explicit security bundle failed checks" >&2; exit 1
+  echo "Explicit security bundle failed checks. Use a current bundle from tools/gen_certs.sh." >&2; exit 1
 fi
 if ! usable_bundle "$str_security"; then
-  str_result=$(bash tools/gen_certs.sh)
+  # The CA scopes the database and profiles. Keep it across WSL restarts.
+  str_state="$HOME/.local/state/dds-asteroids"
+  mkdir -p -m 700 -- "$str_state"
+  [[ -d $str_state && ! -L $str_state && $(stat -c %u "$str_state") == "$(id -u)" ]] || exit 1
+  str_provision=$(mktemp -d "$str_state/local-bundle.XXXXXXXX")
+  str_result=$(bash tools/gen_certs.sh "$str_provision/credentials")
   [[ $str_result == SECURITY_DIR=* ]] || { echo 'Credential generation returned no directory' >&2; exit 1; }
   str_security=${str_result#SECURITY_DIR=}
   usable_bundle "$str_security" || { echo 'Generated credentials failed checks' >&2; exit 1; }
@@ -58,23 +71,37 @@ if ! usable_bundle "$str_security"; then
 fi
 
 str_run=$(mktemp -d build/local-session.XXXXXXXX)
+str_headless_dir=
+arr_server_flags=()
+if [[ $b_headless == true ]]; then
+  str_headless_dir=$(mktemp -d /tmp/dds-asteroids-headless.XXXXXXXX)
+  mkdir -m 700 -- "$str_headless_dir/db" "$str_headless_dir/profiles"
+  arr_server_flags=(--account-dir "$str_headless_dir/db")
+fi
 # Only this shell's active jobs are signalled; cleanup remains bounded on DDS faults.
 cleanup() {
   local -a arr_live=()
   mapfile -t arr_live < <(jobs -pr)
   if (( ${#arr_live[@]} )); then
     kill -TERM "${arr_live[@]}" 2>/dev/null || true
-    sleep 1
+    for ((int_wait=0; int_wait<50; ++int_wait)); do
+      mapfile -t arr_live < <(jobs -pr)
+      (( ${#arr_live[@]} )) || break
+      sleep .1
+    done
     mapfile -t arr_live < <(jobs -pr)
     if (( ${#arr_live[@]} )); then kill -KILL "${arr_live[@]}" 2>/dev/null || true; fi
   fi
   wait || true
+  if [[ $str_headless_dir == /tmp/dds-asteroids-headless.* ]]; then
+    rm -rf -- "$str_headless_dir"
+  fi
 }
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 ./build/release/server --security-dir "$str_security" --duration "$int_duration" \
-  --audit-file "$str_run/audit.log" >"$str_run/server.log" 2>&1 &
+  --audit-file "$str_run/audit.log" "${arr_server_flags[@]}" >"$str_run/server.log" 2>&1 &
 int_server=$!
 for ((int_attempt=0; int_attempt<200; ++int_attempt)); do
   if grep -q '^SERVER_READY ' "$str_run/server.log" 2>/dev/null; then break; fi
@@ -82,28 +109,37 @@ for ((int_attempt=0; int_attempt<200; ++int_attempt)); do
   sleep .1
 done
 grep -q '^SERVER_READY ' "$str_run/server.log" 2>/dev/null || { echo 'Server startup timed out; see "$str_run/server.log"' >&2; exit 1; }
-arr_flags=()
-if [[ $b_headless == true ]]; then arr_flags=(--headless --bot circle); fi
-./build/release/client --security-dir "$str_security" --identity 1 --duration "$int_duration" \
-  "${arr_flags[@]}" >"$str_run/client1.log" 2>&1 &
+launch_client() {
+  local int_identity=$1 str_password
+  local arr_client=(./build/release/client --security-dir "$str_security" --identity "$int_identity"
+                    --duration "$int_duration")
+  if [[ $b_headless == true ]]; then
+    str_password=$(openssl rand -hex 20)
+    exec "${arr_client[@]}" --headless --bot circle --register \
+      --profile-dir "$str_headless_dir/profiles" --credentials-fd 3 \
+      3< <(printf 'player_%s\n%s\n' "$int_identity" "$str_password")
+  fi
+  exec "${arr_client[@]}"
+}
+wait_client() {
+  local int_pid=$1 str_log=$2 str_ready='^CLIENT_LOGIN_READY'
+  if [[ $b_headless == true ]]; then str_ready='CLIENT_JOIN .*status=accepted'; fi
+  for ((int_attempt=0; int_attempt<200; ++int_attempt)); do
+    grep -q "$str_ready" "$str_log" 2>/dev/null && return 0
+    kill -0 "$int_pid" 2>/dev/null || break
+    sleep .1
+  done
+  echo "Client startup failed. See $str_log" >&2
+  return 1
+}
+launch_client 1 >"$str_run/client1.log" 2>&1 &
 int_client1=$!
-for ((int_attempt=0; int_attempt<200; ++int_attempt)); do
-  grep -q 'CLIENT_JOIN .*status=accepted' "$str_run/client1.log" 2>/dev/null && break
-  kill -0 "$int_client1" 2>/dev/null || exit 1
-  sleep .1
-done
-grep -q 'CLIENT_JOIN .*status=accepted' "$str_run/client1.log" 2>/dev/null || exit 1
-./build/release/client --security-dir "$str_security" --identity 2 --duration "$int_duration" \
-  "${arr_flags[@]}" >"$str_run/client2.log" 2>&1 &
+wait_client "$int_client1" "$str_run/client1.log"
+launch_client 2 >"$str_run/client2.log" 2>&1 &
 int_client2=$!
-for ((int_attempt=0; int_attempt<200; ++int_attempt)); do
-  grep -q 'CLIENT_JOIN .*status=accepted' "$str_run/client2.log" 2>/dev/null && break
-  kill -0 "$int_client2" 2>/dev/null || exit 1
-  sleep .1
-done
-grep -q 'CLIENT_JOIN .*status=accepted' "$str_run/client2.log" 2>/dev/null || exit 1
+wait_client "$int_client2" "$str_run/client2.log"
 printf 'Local session started. Logs: %s server=%s client1=%s client2=%s\n' "$str_run" "$int_server" "$int_client1" "$int_client2"
 int_status=0
 wait -n "$int_server" "$int_client1" "$int_client2" || int_status=$?
-if (( int_status )); then echo 'A game process failed; inspect build/local-*.log' >&2; fi
+if (( int_status )); then echo "A game process failed. See $str_run" >&2; fi
 exit "$int_status"

@@ -8,7 +8,9 @@
 #include <dds/security/dds_security_api_defs.h>
 #include <dds/ddsrt/log.h>
 #include "common/security.h"
+#ifndef AST_PLUGIN_DIR
 #define AST_PLUGIN_DIR "/usr/lib/x86_64-linux-gnu/libddsc0debian/"
+#endif
 
 /* Clients need no raw native trace file, even with the server tracing config. */
 static void discard_trace(void *ptr_unused, const dds_log_data_t *str_unused)

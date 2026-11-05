@@ -26,7 +26,8 @@ dds_entity_t endpoint(dds_entity_t int_participant, const dds_topic_descriptor_t
                          DDS_MSECS(100));
     /* Join retries are idempotent: retain the latest response rather than let
      * a non-reading authenticated peer block every other identity's worker. */
-    bool b_all = b_reliable && strcmp(str_kind, "Response") != 0;
+    bool b_all = b_reliable && strcmp(str_kind, "Response") != 0 &&
+                 strcmp(str_kind, "AccountRequest") != 0 && strcmp(str_kind, "AccountResponse") != 0;
     dds_qset_history(str_qos, b_all ? DDS_HISTORY_KEEP_ALL : DDS_HISTORY_KEEP_LAST, 1);
     dds_qset_resource_limits(str_qos, b_all ? 32 : 1, 1, b_all ? 32 : 1);
     dds_qset_liveliness(str_qos, DDS_LIVELINESS_AUTOMATIC, DDS_SECS(3));

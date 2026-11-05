@@ -2,6 +2,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
+#include <openssl/crypto.h>
 #include "client/client.h"
 static volatile sig_atomic_t b_signal = 0;
 
@@ -28,18 +29,34 @@ int main(int int_argc, char **arr_argv)
     setvbuf(stdout, NULL, _IOLBF, 0);
     if (!options_parse(int_argc, arr_argv, &str_client.str_options, false)) { fprintf(stderr, "Invalid client options\n"); return 2; }
     if (signal(SIGINT, stop_signal) == SIG_ERR || signal(SIGTERM, stop_signal) == SIG_ERR) return 1;
+    if (!event_queue_init(&str_client.str_events)) return 1;
+    if (str_client.str_options.int_credentials_fd >= 0 && !login_read_credentials(&str_client, str_client.str_options.int_credentials_fd)) {
+        fputs("Invalid private credential input\n", stderr);
+        OPENSSL_cleanse(&str_client.str_login_command, sizeof(str_client.str_login_command));
+        (void)event_queue_fini(&str_client.str_events);
+        return 2;
+    }
     int int_result = pthread_create(&str_thread, NULL, client_worker, &str_client);
-    if (int_result) { fprintf(stderr, "pthread_create: %s\n", strerror(int_result)); return 1; }
+    if (int_result) {
+        fprintf(stderr, "pthread_create: %s\n", strerror(int_result));
+        OPENSSL_cleanse(&str_client.str_login_command, sizeof(str_client.str_login_command));
+        (void)event_queue_fini(&str_client.str_events);
+        return 1;
+    }
     uint64_t int_deadline = monotonic_ns() + (uint64_t)(str_client.str_options.dbl_duration * 1e9);
     bool b_ok = true;
     if (str_client.str_options.b_headless) headless_run(&str_client, int_deadline);
     else b_ok = render_run(&str_client, int_deadline);
     atomic_store(&str_client.b_stop, true);
+    if (!event_queue_mark(&str_client.str_events, CLIENT_LOGIN_EVENT)) b_ok = false;
     int_result = pthread_join(str_thread, NULL);
     if (int_result) { fprintf(stderr, "pthread_join: %s\n", strerror(int_result)); return 1; }
     puts("CLIENT_EXIT");
+    OPENSSL_cleanse(&str_client.str_login_command, sizeof(str_client.str_login_command));
+    if (!event_queue_fini(&str_client.str_events)) b_ok = false;
     if (pthread_mutex_destroy(&str_client.str_mutex) != 0) b_ok = false;
-    if (!atomic_load(&str_client.int_player_id) && !atomic_load(&str_client.b_rejected)) {
+    if (str_client.str_options.b_headless && !atomic_load(&str_client.b_joined_once) &&
+        !atomic_load(&str_client.b_rejected) && !atomic_load(&str_client.b_account_complete)) {
         fprintf(stderr, "CLIENT_AUTH_OR_SERVER_TIMEOUT no_session\n"); return 1;
     }
     return !b_ok || atomic_load(&str_client.b_failed) ? 1 : 0;

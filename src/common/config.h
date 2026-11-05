@@ -13,8 +13,11 @@
 #define AST_HEARTBEAT_NS UINT64_C(100000000)
 #define AST_JOIN_NS UINT64_C(500000000)
 #define AST_BATCH 16
-/* Join/Input/Leave callbacks per trusted identity; 32-bit coalescing mask. */
-#define AST_EVENT_CHANNELS (AST_IDENTITIES * 3u)
+/* Existing game tags stay stable. The account worker shares the wake mask. */
+#define AST_GAME_READERS (AST_IDENTITIES * 3u)
+#define AST_DDS_READERS (AST_GAME_READERS + AST_IDENTITIES)
+#define AST_ACCOUNT_DONE AST_DDS_READERS
+#define AST_EVENT_CHANNELS (AST_ACCOUNT_DONE + 1u)
 #define AST_EVENT_WAIT_NS UINT64_C(50000000)
 #define AST_JOIN_HISTORY 64
 #define AST_MAX_DURATION 86400u

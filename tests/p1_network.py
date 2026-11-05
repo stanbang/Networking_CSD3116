@@ -13,6 +13,7 @@ import sys
 import time
 sys.dont_write_bytecode = True
 from verify_audit import verify
+from account_fixture import AccountFixture
 
 
 def wait_line(path, pattern, process, timeout=8):
@@ -59,13 +60,14 @@ def main():
     out.mkdir(parents=True, exist_ok=False)
     audit = (out / "server-audit.log").resolve()
     children, handles = [], []
+    accounts = AccountFixture()
 
     def start(name, command):
         path = out / f"{name}.log"
         stream = path.open("x")
         handles.append(stream)
         print("COMMAND", " ".join(map(str, command)), flush=True)
-        proc = subprocess.Popen(list(map(str, command)), stdout=stream, stderr=subprocess.STDOUT)
+        proc = accounts.spawn(command, stdout=stream, stderr=subprocess.STDOUT)
         children.append(proc)
         return proc, path
 

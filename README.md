@@ -1,27 +1,32 @@
 > **Current slim checkpoint, 5 November 2026:** [Exact build/run commands and human checklist](docs/RUN_AND_VERIFY.md). [Evidence and limitations](docs/EVIDENCE.md). T1 timeout-only fallback approved and verified; fresh clone plus uncommitted patch passed build/units/hardening,124.539-second two-client headless and one strict GUI check. Native Leave ACK reliability is still unproven. Historical failures and unsuppressed dependency findings are retained. No submission-ready claim.
 
+> **Current verification:** see [docs/CURRENT_REVIEW.md](docs/CURRENT_REVIEW.md). Fresh build/unit/hardening, secure five-player lifecycle and strict two-window GUI checks pass on Jordain's machine. The full negative-security suite also passes. Preserved ACK-timeout/server-hang failures on Stanley's host and P4 memory/thread findings remain unresolved. [docs/HANDOVER.md](docs/HANDOVER.md) retains the earlier host's evidence.
+
 # DDS Asteroids
 
 Secure, server-authoritative co-op Asteroids in C, using Cyclone DDS, OpenGL, GLFW and OpenSSL. CSD3116, DigiPen SIT. Author: <team>, with declared Codex assistance; updated 2026-11-04.
 
-**Playable locally:** five-player networking, native DDS Security and gameplay/GUI tests pass. Hardening and a two-minute ASan/UBSan five-client churn pass. Full memory-safety verification remains incomplete: TSan reports in the uninstrumented system DDS library and Valgrind uninitialised-byte reports in its crypto send path require investigation. See `docs/TEST_REPORT.md` and `docs/PROGRESS.md`. LAN play, human feel and external Wireshark inspection require human checks.
+**Playable locally:** the latest strict two-window run includes fresh connected state, real movement/fire and normal shutdown. Historical ASan/UBSan churn passed; current listener changes are being reverified. Full memory/thread acceptance remains incomplete: DDS-library TSan reports and Valgrind uninitialised crypto-send bytes require investigation. LAN play, human feel, performance measurements and external packet inspection remain outstanding.
 
 ## Quick start on this Windows machine
 
-Run this in Windows Command Prompt or PowerShell:
+Open Command Prompt or PowerShell in your own repository checkout. Replace the example path below with its actual location:
 
 ```cmd
-wsl -d Ubuntu --cd /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116 -- bash tools/play_local.sh
+cd C:\path\to\Networking_CSD3116
+wsl -d Ubuntu -- bash tools/play_local.sh
 ```
 
 Or, inside Ubuntu:
 
 ```bash
-cd /mnt/c/Users/stanl/Documents/GitHub/Networking_CSD3116
+cd /path/to/Networking_CSD3116
 bash tools/play_local.sh
 ```
 
-The launcher builds the game, prepares private Linux credentials and opens two separate player windows. Click a window to control that player. Closing either window ends this local session. Logs and audit are in the printed unique `build/local-session.XXXXXXXX/` directory. Default session limit is one hour; use `--duration 120` for two minutes. `--fresh-certs` regenerates the private fixture, and `--headless --duration 5` runs two terminal bots. The launcher itself and the actual two-window game have been tested separately; GUI evidence uses Xvfb/software OpenGL.
+The launcher builds the game, prepares private Linux credentials and opens two player login windows. Register a different username in each window on the first run. Enter 3–24 lowercase letters, digits or underscores, press Tab, then enter a password of 12–128 printable ASCII characters. Press Shift+Enter to register or Enter to sign in to an existing account. Use the same window identity on later runs. F2 opts into Remember Me before submitting. On the next launch, the client tries the remembered login automatically.
+
+Click a window to control that player. Closing either window ends this local session. Each run prints its unique `build/local-session.*` log directory. Use `--duration 120` for two minutes or `--headless --duration 8` to run two bots with temporary test accounts. Keep using the same CA bundle to access saved accounts and scores. `--fresh-certs` creates a new CA and a separate account scope. Automated graphical evidence uses Xvfb and software OpenGL.
 
 | Control | Action |
 |---|---|
@@ -29,19 +34,22 @@ The launcher builds the game, prepares private Linux credentials and opens two s
 | Left / Right | Rotate |
 | Space | Fire |
 | R | Restart after shared game-over |
+| B | Show or hide the saved leaderboard |
+| L | Log out and revoke the remembered login |
+| F3 | Forget the remembered login |
 | Escape | Leave / close window |
 
 Ships have inertia/friction and wrap across all edges. Large rocks split into medium, then small; kills award 20/50/100 points. Three lives per player; a hit causes a one-second respawn and two seconds of protection. Friendly fire is off. The HUD shows all players' lives/scores, wave, connection state and an input-echo RTT estimate. See `docs/P3_GAME.md` for mechanics, snapshot bounds and threading.
 
 ## Requirements and build
 
-Ubuntu 24.04/WSL2, GCC/C11, make, pkg-config, Cyclone DDS development/tools, GLFW3, OpenGL, OpenSSL development headers. Graphical play needs WSLg or an X11 display. This machine has Cyclone DDS 0.10.4, GLFW 3.3.10 and OpenSSL 3.0.13; other package layouts have not been verified.
+Ubuntu 24.04/WSL2, GCC/C11, make, pkg-config, Cyclone DDS development/tools, GLFW3, OpenGL, and OpenSSL and SQLite development headers. Graphical play needs WSLg or an X11 display. This machine uses Cyclone DDS 0.10.4, GLFW 3.3.10, OpenSSL 3.0.13 and SQLite 3.45.1.
 
 A human can install dependencies inside Ubuntu:
 
 ```bash
 sudo apt update
-sudo apt install -y build-essential pkg-config git gdb valgrind openssl libssl-dev libgl1-mesa-dev libglfw3-dev cyclonedds-dev cyclonedds-tools xvfb xauth imagemagick xdotool tcpdump
+sudo apt install -y build-essential pkg-config git gdb valgrind cmake openssl libssl-dev libsqlite3-dev libgl1-mesa-dev libglfw3-dev cyclonedds-dev cyclonedds-tools xvfb xauth imagemagick xdotool tcpdump
 ```
 
 From a fresh checkout of this repository:
@@ -65,6 +73,8 @@ bash tools/gen_certs.sh
 
 The final line prints `SECURITY_DIR=/tmp/dds-asteroids.<random>`. Use the actual path below. The Linux directory is 0700 and private keys are 0600; they may disappear on reboot. The Windows-mounted repository does not enforce these Unix modes, so credentials stay outside it. Normal game processes fail closed on unsafe/missing credentials, plugins or policies.
 
+Generate a current signed bundle for the account topics and update both clients and the server together. For a reusable bundle, pass a new directory under your Linux home to `tools/gen_certs.sh`. The server saves accounts and best scores in `~/.local/state/dds-asteroids/server-<CA fingerprint>/accounts.sqlite3`. Opted-in client profiles live under `profiles-<CA fingerprint>` in the same state root. A best score reflects committed server results from completed participation, including leaving a round. Ordinary window close keeps a remembered login. Logout and online Forget revoke it. Treat databases and profiles as private runtime files.
+
 ```bash
 ./build/release/server --security-dir /tmp/YOUR_PRIVATE_BUNDLE --duration 3600
 # Separate terminals, distinct identities:
@@ -72,7 +82,7 @@ The final line prints `SECURITY_DIR=/tmp/dds-asteroids.<random>`. Use the actual
 ./build/release/client --security-dir /tmp/YOUR_PRIVATE_BUNDLE --identity 2 --duration 3600
 ```
 
-Headless clients accept `--headless --bot idle|circle|straight|hunter`. Server also accepts `--ticks N`. `--test-scenario gameover` is an explicit server-only collision fixture for automated testing; it changes setup, is off by default, and is not normal gameplay.
+Headless clients accept `--headless --bot idle|circle|straight|hunter` and use an existing remembered profile or `--credentials-fd N` with username and password on separate newline-terminated lines. `--register` selects registration for that input. Use the launcher for a self-contained two-bot run. The server also accepts `--ticks N` and the explicit test fixture `--test-scenario gameover`.
 
 Native DDS Security uses mutual CA-chained X.509 identities, signed exact-topic permissions and encrypted governance. Only the server can publish authoritative snapshots/responses. The full provisioning fixture holds CA and all participant keys: **never distribute it**. Create a minimal bundle for each machine/participant:
 
@@ -96,12 +106,24 @@ Replace the security directory with the actual generated fixture path. Run netwo
 
 ```bash
 make test
+make build/release/account-join-probe
+python3 -B tests/account_integration.py --security-dir /tmp/YOUR_PRIVATE_BUNDLE --output-dir build/accounts-check-01
 python3 tests/p1_network.py --security-dir /tmp/YOUR_PRIVATE_BUNDLE
 python3 tests/p3_gameplay.py --security-dir /tmp/YOUR_PRIVATE_BUNDLE
 python3 tests/p3_gui.py --security-dir /tmp/YOUR_PRIVATE_BUNDLE
 cc -shared -fPIC -Wall -Wextra tests/rtps_fault.c -o build/rtps_fault.so -ldl -pthread -lcrypto
 python3 tests/p2_security.py --security-dir /tmp/YOUR_PRIVATE_BUNDLE
 ```
+
+Security/P4 harnesses accept `--output-dir NEW_DIRECTORY` and refuse existing output so earlier failures survive reruns. Prefer private Linux-home storage for reusable credentials; `/tmp` fixtures can disappear between sessions.
+
+For authorised external capture, start the secure game and have a human run this in a separate Ubuntu terminal (use a new basename each time):
+
+```bash
+sudo bash tools/capture_demo.sh --secure 30 secure-demo-01.pcap lo
+```
+
+Secure capture retains full IPv4 UDP packets, including later IP fragments, with a 2,000-packet/time bound. Other IPv4 UDP on the selected interface may be included. Inspect actual game packets and reassembly completeness offline before claiming encrypted-payload evidence. The default mode retains full unfragmented IPv4 RTPS packets, matching the upstream capture guide; `--baseline` explicitly selects truncated P0 reference capture. The agent never runs sudo; a prepared helper is not a completed capture.
 
 The security harness uses genuine post-encryption ciphertext corruption, actual native GCM failure and separately chained production diagnostics; it does not substitute a plaintext change before encryption. No-cert discovery is logged as an unauthenticated observation with identity 0 under denying governance, not as an invented certificate failure. The forbidden server-publication test is denied locally by native access control; it does not invent a remote server event for a packet never sent.
 
@@ -111,7 +133,7 @@ Actual unit, five-bot, lifecycle, security, controlled game-over/restart and two
 
 The playable release, unit/physics/security checks, five-client gameplay, controlled restart, two GUI windows, fail-closed hardening and ASan/UBSan churn have actual passing evidence. Full TSan and Valgrind acceptance **does not pass**. Disabling ASLR only for the TSan test processes fixes startup mapping, but the actual game still reports DDS-library races. Valgrind shows zero heap left at exit in all six processes but reports uninitialised bytes in client native-crypto sendmsg paths. No suppressions or blanket false-positive claims were used.
 
-A matching instrumented dependency build/investigation needs CMake, which is missing inside Ubuntu. The human can run there:
+A matching instrumented dependency investigation needs CMake. Jordain installed it manually on 4 November; `cmake --version` reports 3.28.3. On other Ubuntu installations, a human can run:
 
 ```bash
 sudo apt update

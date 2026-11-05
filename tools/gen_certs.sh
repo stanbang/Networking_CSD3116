@@ -41,12 +41,13 @@ topics() {
   local role=$1 operation=$2 identity=$3 i kind
   if [[ $role == server ]]; then
     for i in {1..6}; do
-      if [[ $operation == publish ]]; then echo "<topic>DDSAsteroids_Response_$i</topic>";
-      else for kind in Join Input Leave; do echo "<topic>DDSAsteroids_${kind}_$i</topic>"; done; fi
+      if [[ $operation == publish ]]; then
+        for kind in Response AccountResponse; do echo "<topic>DDSAsteroids_${kind}_$i</topic>"; done
+      else for kind in Join Input Leave AccountRequest; do echo "<topic>DDSAsteroids_${kind}_$i</topic>"; done; fi
     done
   elif [[ $operation == publish ]]; then
-    for kind in Join Input Leave; do echo "<topic>DDSAsteroids_${kind}_$identity</topic>"; done
-  else echo "<topic>DDSAsteroids_Response_$identity</topic>"; fi
+    for kind in Join Input Leave AccountRequest; do echo "<topic>DDSAsteroids_${kind}_$identity</topic>"; done
+  else for kind in Response AccountResponse; do echo "<topic>DDSAsteroids_${kind}_$identity</topic>"; done; fi
   if [[ $operation == publish && $role == server || $operation == subscribe && $role == client ]]; then
     echo '<topic>DDSAsteroids_Snapshot_0</topic>'
   fi

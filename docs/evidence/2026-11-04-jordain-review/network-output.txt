@@ -1,0 +1,26 @@
+COMMAND /mnt/c/Users/jorda/Desktop/Networking_CSD3116/build/release/server --security-dir /tmp/dds-review-g9iprld6/credentials --duration 180 --audit-file /mnt/c/Users/jorda/Desktop/Networking_CSD3116/build/evidence/current-review/network/server-audit.log
+COMMAND /mnt/c/Users/jorda/Desktop/Networking_CSD3116/build/release/client --security-dir /tmp/dds-review-g9iprld6/credentials --identity 1 --headless --bot circle --duration 120
+COMMAND /mnt/c/Users/jorda/Desktop/Networking_CSD3116/build/release/client --security-dir /tmp/dds-review-g9iprld6/credentials --identity 2 --headless --bot circle --duration 120
+COMMAND /mnt/c/Users/jorda/Desktop/Networking_CSD3116/build/release/client --security-dir /tmp/dds-review-g9iprld6/credentials --identity 3 --headless --bot circle --duration 120
+COMMAND /mnt/c/Users/jorda/Desktop/Networking_CSD3116/build/release/client --security-dir /tmp/dds-review-g9iprld6/credentials --identity 4 --headless --bot circle --duration 120
+COMMAND /mnt/c/Users/jorda/Desktop/Networking_CSD3116/build/release/client --security-dir /tmp/dds-review-g9iprld6/credentials --identity 5 --headless --bot circle --duration 120
+PASS concurrent joins: five distinct nonces and slots
+COMMAND /mnt/c/Users/jorda/Desktop/Networking_CSD3116/build/release/client --security-dir /tmp/dds-review-g9iprld6/credentials --identity 6 --headless --bot circle --duration 3
+PASS sixth client rejected
+COMMAND /mnt/c/Users/jorda/Desktop/Networking_CSD3116/build/release/client --security-dir /tmp/dds-review-g9iprld6/credentials --identity 6 --headless --bot circle --duration 120
+PASS explicit leave permits replacement
+COMMAND /mnt/c/Users/jorda/Desktop/Networking_CSD3116/build/release/client --security-dir /tmp/dds-review-g9iprld6/credentials --identity 2 --headless --bot circle --duration 120
+PASS SIGKILL lease expiry permits rejoin
+COMMAND /mnt/c/Users/jorda/Desktop/Networking_CSD3116/build/release/client --security-dir /tmp/dds-review-g9iprld6/credentials --identity 6 --headless --bot circle --duration 30 --fault spoof
+PASS SERVER_DROP identity=6 reason=spoof
+COMMAND /mnt/c/Users/jorda/Desktop/Networking_CSD3116/build/release/client --security-dir /tmp/dds-review-g9iprld6/credentials --identity 6 --headless --bot circle --duration 30 --fault session
+PASS SERVER_DROP identity=6 reason=session
+COMMAND /mnt/c/Users/jorda/Desktop/Networking_CSD3116/build/release/client --security-dir /tmp/dds-review-g9iprld6/credentials --identity 6 --headless --bot circle --duration 30 --fault id-zero
+PASS SERVER_DROP identity=6 reason=id-zero
+COMMAND /mnt/c/Users/jorda/Desktop/Networking_CSD3116/build/release/client --security-dir /tmp/dds-review-g9iprld6/credentials --identity 6 --headless --bot circle --duration 30 --fault id-high
+PASS SERVER_DROP identity=6 reason=id-high
+COMMAND /mnt/c/Users/jorda/Desktop/Networking_CSD3116/build/release/client --security-dir /tmp/dds-review-g9iprld6/credentials --identity 6 --headless --bot circle --duration 30 --fault replay
+PASS SERVER_DROP identity=6 reason=replay
+SERVER_SUMMARY joins=12 rejects=1 leaves=11 timeouts=1 invalid=4 stale=1 peak=5 inputs=358 rate_hits=0 auth_failures=0 middleware_events=7 moves=2343 shots=199 destroyed=27 splits=12 hits=0 respawns=0 gameovers=0 restarts=0 wraps=0 snapshots=223 points=1980 ticks=671
+PASS lifecycle audit records=34 root=06c57100f33372c1d9ffab9b43687cf8ed074d8cc3f6f92bd6fe3d2346a98cae
+PASS P1 networking lifecycle and malformed-message counters

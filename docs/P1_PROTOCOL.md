@@ -1,5 +1,7 @@
 # Current merged-protocol note
 
+The account layer adds fixed-size AstAccount request and response types from `idl/accounts.idl` on six identity-specific channel pairs. The native signed permissions grant clients write access only to their own account request topic and read access only to their own account response topic. The gameplay wire format is the same. Join reuses its client nonce to prove the live account binding, checked by the server against the identity associated with the reader. HELLO, epoch/challenge, message correlation, retry limits and worker state are described in [the account design](ACCOUNT_FEATURE_DESIGN.md).
+
 The merged implementation now enables native security by default and requires --security-dir with a valid private Linux bundle. Historical pre-security P1 text below describes development history, not permission for plaintext production use. Use current README/INTEGRATION.md for exact verification status; secure GUI acceptance currently fails on this host.
 
 ---

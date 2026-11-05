@@ -1,19 +1,30 @@
 #!/usr/bin/env bash
-# Purpose: bounded, local secure-game DDS capture. Author: CSD3116 team + AI; updated 2026-11-05.
+# Purpose: bounded full-packet secure capture with explicit baseline mode. Team + AI, 2026-11-05.
 # Human invokes with sudo if needed; this script never invokes sudo itself.
 # Output stays in the invoking user's Linux home, where mode 0600 can be verified.
 # IPv4 RTPS magic selects DDS packets even when Cyclone chooses ephemeral UDP ports.
 # Source: installed dds/ddsi/q_protocol.h Header_t and NN_PROTOCOLID_AS_UINT32.
 set -euo pipefail
 umask 077
-ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+b_secure=false
+b_baseline=false
+if [[ ${1:-} == --secure ]]; then b_secure=true; shift;
+elif [[ ${1:-} == --baseline ]]; then b_baseline=true; shift; fi
+usage() {
+    echo 'Usage: bash tools/capture_demo.sh [--secure|--baseline] [seconds 1..120] [basename.pcap] [interface=lo]'
+    echo 'Default: full unfragmented IPv4 RTPS. --secure: full IPv4 UDP including fragments.'
+    echo '--baseline: truncated P0 reference capture only.'
+    echo 'Capture only an authorised interface/session; unrelated UDP may be included.'
+}
+if [[ ${1:-} == --help ]]; then usage; exit 0; fi
 SECONDS_TO_CAPTURE="${1:-30}"
-BASENAME="${2:-secure-demo.pcap}"
+str_default=secure-demo.pcap
+if [[ $b_baseline == true ]]; then str_default=p0-demo.pcap; fi
+BASENAME="${2:-$str_default}"
 INTERFACE="${3:-lo}"
 if (( $# > 3 )) || [[ ! "$SECONDS_TO_CAPTURE" =~ ^[0-9]{1,3}$ ]] ||
    (( 10#$SECONDS_TO_CAPTURE < 1 || 10#$SECONDS_TO_CAPTURE > 120 )); then
-    echo 'Usage: bash tools/capture_demo.sh [seconds 1..120] [basename.pcap] [interface=lo]' >&2
-    echo 'Selects IPv4 RTPS on any UDP port; default lo, or select another active interface.' >&2
+    usage >&2
     exit 1
 fi
 if [[ ! "$INTERFACE" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ||
@@ -28,8 +39,8 @@ fi
 for TOOL in tcpdump timeout mktemp; do
     command -v "$TOOL" >/dev/null || { echo "Missing $TOOL" >&2; exit 1; }
 done
-if [[ -n "${CYCLONEDDS_URI:-}" ]]; then
-    echo 'Unset CYCLONEDDS_URI; this guide verifies config/cyclonedds.xml (domain42, loopback).'  >&2
+if [[ $b_secure == false && -n "${CYCLONEDDS_URI:-}" ]]; then
+    echo 'Unset CYCLONEDDS_URI for the default capture guide (secure config: domain42/lo).' >&2
     exit 1
 fi
 CAPTURE_USER="$(id -un)"
@@ -85,25 +96,45 @@ if [[ "$(stat -c %a -- "$TEMP")" != 600 ||
     echo 'This filesystem cannot provide private user-owned capture files.' >&2
     exit 1
 fi
-echo "DDS capture: $INTERFACE, IPv4 RTPS on any UDP port, ${SECONDS_TO_CAPTURE}s."
-echo 'Bound: 4000 packets, 65535 captured bytes per packet; full IPv4 UDP datagrams when unfragmented.'
-echo 'Filter: ip and udp and udp[8:4] = 0x52545053 (RTPS header; no authentication).'
-echo 'Other IPv4 DDS/RTPS traffic on this interface can be captured; no domain isolation.'
-echo 'No IPv6 or IP-fragment reassembly. Analysis must check truncation and RTPS security structure.'
-echo 'Current secure config uses domain42 on lo. Baseline/other configurations require their actual interface.'
-echo 'Start capture first, then launch the secure game in another terminal. Capture alone does not prove encryption.'
+int_snaplen=65535
+int_packets=4000
+str_filter='ip and udp and udp[8:4] = 0x52545053'
+if [[ $b_secure == true ]]; then
+    int_snaplen=0
+    int_packets=2000
+    # A UDP-port/RTPS-header filter would discard later IPv4 fragments. Preserve
+    # the complete IPv4 UDP stream for offline reassembly and DDS inspection.
+    str_filter='ip proto 17'
+    echo "Secure-game evidence capture: $INTERFACE, ${SECONDS_TO_CAPTURE}s, at most $int_packets packets."
+    echo 'Full snapshot length (-s 0); includes IPv4 UDP fragments, no IPv6.'
+    echo 'All IPv4 UDP on this interface may be recorded, including unrelated traffic.'
+    echo 'Run the secure game in another terminal; inspect the actual pcap before claiming encryption.'
+elif [[ $b_baseline == true ]]; then
+    int_snaplen=256
+    int_packets=10000
+    echo "P0 PLAINTEXT capture: $INTERFACE, IPv4 RTPS, ${SECONDS_TO_CAPTURE}s."
+    echo 'Bound: 10000 packets, 256 captured bytes per packet (P0-only, truncated).'
+    echo 'Other IPv4 DDS traffic may be recorded; no IPv6 or later IP fragments.'
+    echo 'Use play.sh --baseline for P0; loopback may be empty if the baseline uses eth0.'
+else
+    echo "DDS capture: $INTERFACE, IPv4 RTPS, ${SECONDS_TO_CAPTURE}s."
+    echo 'Bound: 4000 packets, 65535 bytes each; full unfragmented IPv4 UDP datagrams.'
+    echo 'RTPS filter omits later IP fragments; no IPv6/reassembly. --secure retains IPv4 UDP fragments.'
+    echo 'Start capture first, then the secure game. Inspect actual RTPS security structure offline.'
+fi
+printf 'Filter: %s\n' "$str_filter"
 set +e
 timeout --signal=INT --kill-after=3s "${SECONDS_TO_CAPTURE}s" \
-    tcpdump -n -i "$INTERFACE" -s 65535 -c 4000 -U -Z "$CAPTURE_USER" \
-    -w "$TEMP" 'ip and udp and udp[8:4] = 0x52545053'
+    tcpdump -n -i "$INTERFACE" -s "$int_snaplen" -c "$int_packets" -U -Z "$CAPTURE_USER" \
+    -w "$TEMP" "$str_filter"
 RESULT=$?
 set -e
 if (( RESULT != 0 && RESULT != 124 )); then
-    echo "Capture failed (exit $RESULT). Human may run: sudo bash tools/capture_demo.sh" >&2
+    echo "Capture failed (exit $RESULT). Run this script with the same arguments in a human sudo terminal if needed." >&2
     exit "$RESULT"
 fi
 if (( $(stat -c %s -- "$TEMP") <= 24 )); then
-    echo 'No packets captured; check game activity/interface. No evidence produced.' >&2
+    echo 'No packets captured; verify the game is running and the selected interface. No evidence produced.' >&2
     exit 1
 fi
 # tcpdump's stderr includes its packet counts; a complete packet must also exist.

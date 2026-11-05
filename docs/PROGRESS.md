@@ -1,3 +1,21 @@
+# Account implementation ready for manual review, 5 November 2026
+
+Jordain reported Stanley's design approval and installed SQLite development support in Ubuntu. J1–J3 now provide mandatory account authentication, server-owned best scores and a saved leaderboard, plus Remember Me with token rotation and revocation. New and existing local automated checks are recorded in [TEST_REPORT.md](TEST_REPORT.md).
+
+The integration uses one extra worker, six certificate-bound accounts and a five-player cap. Both clients and the server need current signed permissions. The local launcher keeps its generated CA bundle in private Linux storage so subsequent sessions find their account state. Stanley's manual acceptance and verification of a published checkout remain open. Earlier native dependency diagnostics, external packet capture and two-computer testing remain separate.
+
+# Jordain account-feature assignment — J0 design record, 5 November 2026
+
+User supplied TEAMMATE_HANDOVER_2026-11-05.md and said Stanley assigned this work. Attachment text matches the repository copy after newline normalization. Three real agents reviewed protocol, UI and storage requirements, dependencies and score-reset hooks. ACCOUNT_APPROVAL.md summarizes the approved design. ACCOUNT_FEATURE_DESIGN.md and docs/proposals/ contain the detailed design and schema drafts. The IDL syntax, unapplied patch and in-memory SQLite checks passed. The OpenSSL scrypt feasibility probe took about 0.34–0.43 seconds per check.
+
+---
+
+# Pulled and reconciled on Jordain's machine — 5 November 2026
+
+At the user's request, pulled `origin/main` from `3dae8e3` to `480227c` by fast-forward. Preserved all 22 local changed/new files in a verified external backup and retained stash `5e5dfc38faee3849c2a283388e37ab052089ad44`. Resolved five stash conflicts: retained upstream's approved Leave timeout warning/fallback and fresh server-release tests alongside local padding-clearing writes and count/timing diagnostics; preserved both evidence histories and capture modes. The default capture remains full unfragmented IPv4 RTPS as upstream expects, with optional `--secure` fragment-inclusive capture and explicit `--baseline` mode. Build, unit tests, hardening, updated P1 lifecycle and injected ACK-timeout handling all exited 0. Raw evidence: `build/evidence/pull-480227c-20261105T030706Z/`. Local work remains unstaged/uncommitted; no push or new feature implementation. Earlier checkpoint claims below refer to their stated hosts/revisions.
+
+---
+
 # Latest teammate takeover - 5 November 2026
 
 Stanley requested a teammate handover and publication of completed work. Read [TEAMMATE_HANDOVER_2026-11-05.md](../TEAMMATE_HANDOVER_2026-11-05.md) first. It lists verified work, open gates/tests, requested but unimplemented login/high-score/remember-user tasks for Jordain, contribution honesty and source-ZIP inclusions/exclusions. Existing blocked capture and other limitations remain. Historical status below is preserved.
@@ -42,7 +60,16 @@ Acceptance for the next candidate: identify a concrete cause with native/API/QoS
 Resumed preflight output (command -v): /usr/bin/xvfb-run, /usr/bin/xauth, /usr/bin/import, /usr/bin/xdotool, /usr/bin/tcpdump. CMake is still absent; matching instrumented dependency work in P4 requires the human's previously documented installation command. No server/client/Xvfb processes were listed. Private fixture directory metadata: mode700 uid1000. CycloneDDS version0.10.4. These are prerequisite checks, not new runtime passes.
 
 ---
-# Paused checkpoint - latest authoritative status
+
+---
+
+# Resumed investigation — Jordain, 4 November 2026
+
+User requested continuing the pulled-code checklist. Three real agents resumed builder/reviewer/tester work. Fresh P2 negative-security suite and literal clean-clone HEAD build/unit/hardening checks passed. CMake was manually installed by the user (verified 3.28.3); exact Ubuntu DDS source and isolated symbols/TSan core+security-plugin builds are ready. The current ten-minute ASan/UBSan churn is in progress, so no result is claimed yet. Native Leave diagnostics preserve the one-second required ACK and record only reader counts/result/timing. No breaking protocol or security-mechanism change, package installation by agents, commit/push or /usr library replacement. See CURRENT_REVIEW.md and retained build/evidence/current-review/ outputs; earlier failures below remain open/historical rather than erased.
+
+---
+
+# Paused teammate checkpoint — historical status
 
 Stanley explicitly paused the goal on4November2026 and requested a teammate handover plus publication. Read HANDOVER.md first. The listener repair preserves active two-client GUI state in the latest targeted run, but overall GUI/network checks still FAIL native one-second Leave ACK timeout. No further game tests/repairs after pause. Selected portable raw evidence is in docs/evidence/2026-11-04-handover/. Earlier status text below is historical. No goal-complete or submission-ready claim.
 

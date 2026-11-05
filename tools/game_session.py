@@ -74,7 +74,7 @@ def stop(state):
 
 
 def play(args, previous):
-    """Launch the real secure contributor script and require two actual admissions."""
+    """Launch the secure session and wait for both login windows or headless admissions."""
     if previous:
         fd = owned_fd(previous)
         if fd is not None:

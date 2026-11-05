@@ -1,6 +1,8 @@
 /* Main-thread neon line renderer with delayed interpolation. Author: <team>/Codex, 2026-11-04. */
 #include <GLFW/glfw3.h>
 #include <math.h>
+#include <inttypes.h>
+#include <openssl/crypto.h>
 #include <stdio.h>
 #include <string.h>
 #include <stb_easy_font.h>
@@ -10,10 +12,16 @@ typedef struct { char str_text[160]; int int_quads; _Alignas(16) char arr_vertic
 typedef struct { float flt_x,flt_y,flt_vx,flt_vy,flt_life; } Particle;
 typedef struct {
     Text str_title,str_status,str_wave,str_controls,str_over,str_restart,arr_players[AST_PLAYERS];
+    Text arr_login[9], str_account, str_leaders, arr_leaders[CLIENT_LEADERS_CAP];
     Particle arr_particles[AST_PARTICLES];
     Frame str_previous;
     uint64_t int_last_time;
 } Renderer;
+typedef struct {
+    Client *ptr_client;
+    LoginCommand str_input;
+    bool b_password_focus, b_show_leaders, b_format_error;
+} LoginForm;
 static const float arr_colors[AST_PLAYERS][3] = {{0.25f,1,0.75f},{0.4f,0.65f,1},{1,0.5f,0.7f},{1,0.85f,0.3f},{0.75f,0.5f,1}};
 
 /* Rebuild cached glyph vertices only when the text changes. */
@@ -194,6 +202,150 @@ static void input_keys(Client *str_client,GLFWwindow *str_window)
     if(glfwGetKey(str_window,GLFW_KEY_ESCAPE)==GLFW_PRESS) glfwSetWindowShouldClose(str_window,GLFW_TRUE);
 }
 
+/* GLFW callbacks own the editable buffers on the render thread. */
+static void login_character(GLFWwindow *str_window, unsigned int int_codepoint)
+{
+    LoginForm *str_form = glfwGetWindowUserPointer(str_window);
+    LoginView str_view;
+    login_view(str_form->ptr_client, &str_view);
+    if (str_view.int_phase != LOGIN_FORM) return;
+    LoginCommand *str_input = &str_form->str_input;
+    if (str_form->b_password_focus) {
+        if (int_codepoint >= 0x20 && int_codepoint <= 0x7e && str_input->int_password_length < CLIENT_PASSWORD_CAP)
+            str_input->arr_password[str_input->int_password_length++] = (unsigned char)int_codepoint;
+        else { str_form->b_format_error = true; return; }
+    } else {
+        bool b_valid = (int_codepoint >= 'a' && int_codepoint <= 'z') ||
+                       (int_codepoint >= '0' && int_codepoint <= '9') || int_codepoint == '_';
+        if (b_valid && str_input->int_name_length < CLIENT_NAME_CAP)
+            str_input->arr_name[str_input->int_name_length++] = (unsigned char)int_codepoint;
+        else { str_form->b_format_error = true; return; }
+    }
+    str_form->b_format_error = false;
+}
+
+static void login_controls(LoginForm *str_form, int int_key, int int_action, int int_mods, bool b_remembered)
+{
+    if (int_action == GLFW_RELEASE) return;
+    LoginCommand *str_input = &str_form->str_input;
+    if (int_key == GLFW_KEY_BACKSPACE) {
+        if (str_form->b_password_focus && str_input->int_password_length)
+            str_input->arr_password[--str_input->int_password_length] = 0;
+        else if (!str_form->b_password_focus && str_input->int_name_length)
+            str_input->arr_name[--str_input->int_name_length] = 0;
+        str_form->b_format_error = false;
+        return;
+    }
+    if (int_action != GLFW_PRESS) return;
+    if (int_key == GLFW_KEY_TAB) str_form->b_password_focus = !str_form->b_password_focus;
+    else if (int_key == GLFW_KEY_F2) str_input->b_remember = !str_input->b_remember;
+    else if (int_key == GLFW_KEY_F3 && b_remembered) {
+        LoginCommand str_command = {.int_operation = AstAccount_FORGET};
+        (void)login_submit(str_form->ptr_client, &str_command);
+    } else if (int_key == GLFW_KEY_ENTER || int_key == GLFW_KEY_KP_ENTER) {
+        str_input->int_operation = (int_mods & GLFW_MOD_SHIFT) ? AstAccount_REGISTER : AstAccount_LOGIN;
+        str_form->b_format_error = !login_submit(str_form->ptr_client, str_input);
+        if (!str_form->b_format_error) {
+            OPENSSL_cleanse(str_input->arr_password, sizeof(str_input->arr_password));
+            str_input->int_password_length = 0;
+        }
+    }
+}
+
+static void login_key(GLFWwindow *str_window, int int_key, int int_scan, int int_action, int int_mods)
+{
+    (void)int_scan;
+    LoginForm *str_form = glfwGetWindowUserPointer(str_window);
+    LoginView str_view;
+    login_view(str_form->ptr_client, &str_view);
+    if (int_key == GLFW_KEY_ESCAPE && int_action == GLFW_PRESS) glfwSetWindowShouldClose(str_window, GLFW_TRUE);
+    if (str_view.int_phase == LOGIN_FORM) login_controls(str_form, int_key, int_action, int_mods, str_view.b_remembered);
+    else if (str_view.int_phase == LOGIN_ACTIVE && int_action == GLFW_PRESS) {
+        LoginCommand str_command = {0};
+        if (int_key == GLFW_KEY_B) {
+            str_form->b_show_leaders = !str_form->b_show_leaders;
+            if (str_form->b_show_leaders) str_command.int_operation = AstAccount_LEADERBOARD;
+        } else if (int_key == GLFW_KEY_L) {
+            str_command.int_operation = AstAccount_LOGOUT;
+            str_form->b_show_leaders = false;
+            str_form->str_input.b_remember = false;
+        } else if (int_key == GLFW_KEY_F3) str_command.int_operation = AstAccount_FORGET;
+        if (str_command.int_operation) (void)login_submit(str_form->ptr_client, &str_command);
+    }
+}
+
+static const char *profile_message(ProfileNotice int_notice)
+{
+    switch (int_notice) {
+    case PROFILE_NOTICE_UNAVAILABLE: return "Private profile unavailable";
+    case PROFILE_NOTICE_NOT_SAVED: return "Remember me could not save this login";
+    case PROFILE_NOTICE_FORGOTTEN: return "Remembered login cleared";
+    case PROFILE_NOTICE_LOCAL_ONLY: return "Local profile cleared. Server revocation unconfirmed";
+    default: return "";
+    }
+}
+
+static void login_draw(Renderer *str_renderer, LoginForm *str_form, const LoginView *str_view)
+{
+    char str_text[100], str_mask[49] = {0};
+    size_t int_mask = str_form->str_input.int_password_length;
+    if (int_mask >= sizeof(str_mask)) int_mask = sizeof(str_mask) - 1;
+    memset(str_mask, '*', int_mask);
+    glColor3f(0.45f,0.9f,1);
+    text_draw(&str_renderer->str_title, "DDS ASTEROIDS", 238, 100, 3);
+    const char *str_status = str_view->int_phase == LOGIN_ENDING ? "Signing out..." :
+        str_view->int_phase == LOGIN_PENDING ? "Connecting and authenticating..." :
+        !atomic_load(&str_form->ptr_client->b_ready) ? "Starting secure DDS..." : "Certificate and account required";
+    text_draw(&str_renderer->arr_login[0], str_status, 156, 156, 1.6f);
+    if (str_view->int_phase == LOGIN_FORM) {
+        const LoginCommand *str_input = &str_form->str_input;
+        snprintf(str_text, sizeof(str_text), "%s USERNAME  %.*s", str_form->b_password_focus ? " " : ">",
+                 (int)str_input->int_name_length, (const char *)str_input->arr_name);
+        text_draw(&str_renderer->arr_login[1], str_text, 156, 217, 1.8f);
+        snprintf(str_text, sizeof(str_text), "%s PASSWORD  %s", str_form->b_password_focus ? ">" : " ", str_mask);
+        text_draw(&str_renderer->arr_login[2], str_text, 156, 250, 1.5f);
+        snprintf(str_text, sizeof(str_text), "F2  Remember me: %s", str_input->b_remember ? "ON" : "OFF");
+        text_draw(&str_renderer->arr_login[3], str_text, 156, 290, 1.5f);
+        text_draw(&str_renderer->arr_login[4], "TAB  Next field    ENTER  Sign in    SHIFT+ENTER  Register", 156, 335, 1.25f);
+        if (str_view->b_remembered)
+            text_draw(&str_renderer->arr_login[5], "F3  Forget saved login", 156, 357, 1.4f);
+    }
+    glColor3f(1,0.65f,0.45f);
+    if (str_form->b_format_error)
+        text_draw(&str_renderer->arr_login[6], "Use 3-24 lowercase letters, digits or _, and 12-128 printable password bytes", 107, 397, 1.15f);
+    else if (str_view->b_error)
+        text_draw(&str_renderer->arr_login[6], login_status_text(str_view->int_status), 156, 397, 1.4f);
+    text_draw(&str_renderer->arr_login[7], profile_message(str_view->int_profile_notice), 156, 430, 1.4f);
+    text_draw(&str_renderer->arr_login[8], "ESC  Close", 156, 465, 1.4f);
+}
+
+static void account_hud(Renderer *str_renderer, const LoginView *str_view, bool b_show_leaders)
+{
+    char str_text[120];
+    glColor3f(0.75f,0.9f,1);
+    snprintf(str_text, sizeof(str_text), "%s   BEST %" PRIu64 "   B: LEADERBOARD   L: LOGOUT   F3: FORGET",
+             str_view->str_username, str_view->int_own_best);
+    text_draw(&str_renderer->str_account, str_text, 24, 545, 1.25f);
+    if (str_view->int_profile_notice != PROFILE_NOTICE_NONE || str_view->b_error) {
+        glColor3f(1,0.65f,0.45f);
+        text_draw(&str_renderer->arr_login[7], str_view->b_error ? login_status_text(str_view->int_status) :
+                  profile_message(str_view->int_profile_notice), 24, 520, 1.25f);
+    }
+    if (!b_show_leaders) return;
+    glColor3f(0.018f,0.025f,0.055f);
+    glBegin(GL_QUADS);
+    glVertex2f(216,160); glVertex2f(590,160); glVertex2f(590,488); glVertex2f(216,488);
+    glEnd();
+    glColor3f(0.45f,0.9f,1);
+    text_draw(&str_renderer->str_leaders, "SAVED HIGH SCORES", 247, 186, 2.1f);
+    for (unsigned int int_i = 0; int_i < str_view->int_entries; ++int_i) {
+        const AstAccount_LeaderEntry *str_entry = &str_view->arr_entries[int_i];
+        snprintf(str_text, sizeof(str_text), "%u.  %.*s   %" PRIu64, int_i + 1,
+                 (int)str_entry->int_username_length, (const char *)str_entry->arr_username, str_entry->int_best_score);
+        text_draw(&str_renderer->arr_leaders[int_i], str_text, 247, 227 + 21 * int_i, 1.5f);
+    }
+}
+
 /* Frame copies and particle buffers live on main's stack for the entire window. */
 bool render_run(Client *str_client,uint64_t int_deadline)
 {
@@ -204,9 +356,24 @@ bool render_run(Client *str_client,uint64_t int_deadline)
     glMatrixMode(GL_PROJECTION);glLoadIdentity();glOrtho(0,AST_WIDTH,AST_HEIGHT,0,-1,1);
     glMatrixMode(GL_MODELVIEW);glLoadIdentity();
     Renderer str_renderer={0};str_renderer.int_last_time=monotonic_ns();
+    LoginForm str_form = {.ptr_client = str_client, .str_input.b_remember = str_client->str_options.b_remember};
+    glfwSetWindowUserPointer(str_window, &str_form);
+    glfwSetCharCallback(str_window, login_character);
+    glfwSetKeyCallback(str_window, login_key);
+    puts("CLIENT_LOGIN_READY");
     while(!client_interrupted()&&!glfwWindowShouldClose(str_window)&&
         (!atomic_load(&str_client->b_stop)||atomic_load(&str_client->b_rejected))&&monotonic_ns()<int_deadline) {
-        glfwPollEvents();input_keys(str_client,str_window);background();
+        glfwPollEvents();background();
+        LoginView str_view;
+        login_view(str_client, &str_view);
+        if (str_view.int_phase != LOGIN_ACTIVE) {
+            atomic_store(&str_client->int_keys, 0);
+            login_draw(&str_renderer, &str_form, &str_view);
+            glfwSwapBuffers(str_window);
+            sleep_ns(UINT64_C(1000000000)/AST_HZ);
+            continue;
+        }
+        input_keys(str_client,str_window);
         Frame str_from={0},str_to={0};float flt_alpha=1;
         uint64_t int_now=monotonic_ns();float flt_dt=fminf((float)(int_now-str_renderer.int_last_time)/1e9f,0.1f);
         str_renderer.int_last_time=int_now;
@@ -216,8 +383,11 @@ bool render_run(Client *str_client,uint64_t int_deadline)
                 ship_draw(&str_to.arr_ships[int_i],old_ship(&str_from,str_to.arr_ships[int_i].int_player_id),flt_alpha,str_to.int_tick);
             particles_update(&str_renderer,&str_to,flt_dt);
         }
-        hud(&str_renderer,str_client,&str_to);glfwSwapBuffers(str_window);
+        hud(&str_renderer,str_client,&str_to);
+        account_hud(&str_renderer, &str_view, str_form.b_show_leaders);
+        glfwSwapBuffers(str_window);
         sleep_ns(UINT64_C(1000000000)/AST_HZ);
     }
+    OPENSSL_cleanse(&str_form.str_input, sizeof(str_form.str_input));
     glfwDestroyWindow(str_window);glfwTerminate();return true;
 }
