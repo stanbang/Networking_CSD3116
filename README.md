@@ -1,4 +1,46 @@
-# Offline build and local game
+# Networked Asteroids — C Multiplayer Systems Project
+
+A two-player local Asteroids-style game written in **C**, demonstrating networked game communication, authentication, session recovery, and Linux-based build tooling.
+
+## At a glance
+
+| Area | What the project demonstrates |
+| --- | --- |
+| Networking | Two clients communicating through a server using Cyclone DDS |
+| Security | Local account authentication, generated certificates, and credential-aware reconnection |
+| Persistence | SQLite-backed accounts and scores stored outside the distribution |
+| Reliability | A 30-second player reconnection window and headless smoke testing |
+| Systems | GCC/C, Ubuntu 24.04, Windows Subsystem for Linux (WSL2), OpenSSL and scripted launchers |
+
+## Quick start
+
+**Requirements:** Windows with WSL2, Ubuntu 24.04 (default distribution), WSLg, and an installed C compiler/toolchain. This bundled SDK is for Ubuntu 24.04 x86-64 and does not install dependencies.
+
+1. Download/extract the complete repository or release bundle.
+2. On Windows, double-click `RunGame.cmd`; or, from an Ubuntu terminal in the project directory, run:
+   ```bash
+   bash run.sh
+   ```
+3. Create and log into **two different player accounts**.
+4. Use the arrow keys to move and Space to shoot. Stop the launcher with Ctrl+C.
+
+For build-only verification, run `bash tools/build_portable.sh`. For a temporary-account smoke test, run `bash run.sh --headless --duration 12`.
+
+## What to review
+
+- [C source code](src/)
+- [Network interface definitions](idl/)
+- [Build and launcher scripts](tools/)
+- [Project documentation](docs/)
+- [Configuration files](config/)
+
+**Privacy note:** Never commit or distribute locally generated certificates, private keys, account databases, saved sessions or packet captures.
+
+**Team attribution:** This is a collaborative repository. Refer to the individual commit history for each contributor's implementation work.
+
+---
+
+## Detailed build, gameplay and troubleshooting instructions
 
 On Windows: extract the entire ZIP, then double-click **RunGame.cmd**. Do not double-click run.sh; it is the Ubuntu entry point. Keep the launcher terminal open while playing. The first compile can take about a minute and prints server/client build progress. If a command fails, the Windows launcher keeps the error visible. The default WSL distribution must be Ubuntu24.04 with its C compiler already available.
 
